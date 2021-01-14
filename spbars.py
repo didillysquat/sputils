@@ -141,7 +141,7 @@ class SPBars:
                     time_out_iterations=10000,
                     warnings_off=True)
             )
-            self._make_profile_color_dict()
+            self.profile_color_dict = self._make_profile_color_dict()
 
     def _make_profile_color_dict(self):
         prof_color_dict = {}
@@ -152,36 +152,46 @@ class SPBars:
                 prof_color_dict[prof_uid] = next(self.grey_iterator)
         return prof_color_dict
 
-
-        # TODO setup colors for profiles
         foo = 'bar'
 
     def plot(self):
-        if self.plot_type in ['seq_only', 'profile_only']:
-            x_index_for_plot = 0
-            colour_list = []
-            for sample_uid in sample_uids:
-                bottom = 0
-                non_zero_seq_abundances = self.sp_seq_rel_abund_df.loc[sample_uid][
-                    self.sp_seq_rel_abund_df.loc[sample_uid] > 0]
-                for seq_uid, rel_abund in non_zero_seq_abundances.iteritems():
-                    self.bar_patches.append(Rectangle(
-                        (x_index_for_plot - 0.5, bottom),
-                        1,
-                        rel_abund, color=self.seq_color_dict[seq_uid]))
-                    bottom += rel_abund
-                    colour_list.append(self.seq_color_dict[seq_uid])
-                x_index_for_plot += 1
-            listed_colour_map = ListedColormap(colour_list)
-            patches_collection = PatchCollection(self.bar_patches, cmap=listed_colour_map)
-            patches_collection.set_array(np.arange(len(self.bar_patches)))
-            self.bar_ax.add_collection(patches_collection)
-            self.bar_ax.autoscale_view()
-            self.fig.canvas.draw()
-            raise NotImplemented
+        if self.plot_type =='seq_only':
+            self._plot_bars_horizontal_single_type(self.seq_color_dict, self.seq_count_df)
+        elif self.plot_type == 'profile_only':
+            self._plot_bars_horizontal_single_type(self.profile_color_dict, self.profile_count_df)
         elif self.plot_type == 'profile_only':
             raise NotImplemented
 
+    def _plot_bars_horizontal_single_type(self, color_dict, df):
+        """
+        Plots every instance of a sequence or profile on a per sample basis.
+        Each sample is a horizontal stacked bar, with each rectangle of the stack representing
+        a profile or sequences instance in that sample.
+
+        :param color_dict: color dict used for either the sequence or profiles being plotted
+        :param df: the abundance df used for the plotting
+        :return: None
+        """
+        x_index_for_plot = 0
+        colour_list = []
+        for sample_uid in df.index:
+            bottom = 0
+            non_zero_seq_abundances = df.loc[sample_uid][
+                df.loc[sample_uid] > 0]
+            for obj_uid, abund in non_zero_seq_abundances.iteritems():
+                self.bar_patches.append(Rectangle(
+                    (x_index_for_plot - 0.5, bottom),
+                    1,
+                    abund, color=color_dict[obj_uid]))
+                bottom += abund
+                colour_list.append(color_dict[obj_uid])
+            x_index_for_plot += 1
+        listed_colour_map = ListedColormap(colour_list)
+        patches_collection = PatchCollection(self.bar_patches, cmap=listed_colour_map)
+        patches_collection.set_array(np.arange(len(self.bar_patches)))
+        self.bar_ax.add_collection(patches_collection)
+        self.bar_ax.autoscale_view()
+        self.fig.canvas.draw()
 
     def _make_seq_colour_dict(self):
         seq_color_dict = {}
@@ -201,7 +211,7 @@ class SPBars:
 
         :param figsize: user supplied figure size tuple(<int>, <int>) in mm
 
-        :return: None. But, self.bar_ax, self.leg_ax_one and self.leg_ax_two (if plot_type is 'seq_and_profile')
+        :return: None. But, self.fig, self.bar_ax, self.leg_ax_one and self.leg_ax_two (if plot_type is 'seq_and_profile')
         will be set.
         """
         if self.legend:
@@ -219,7 +229,7 @@ class SPBars:
             # The bars will span the full height of the figure
             if figsize:
                 # TODO enforce a minimum size
-                fig = plt.figure(figsize=self._mm2inch(figsize))
+                self.fig = plt.figure(figsize=self._mm2inch(figsize))
             else:
                 # Deduce the fig size automatically
                 # width will be one column so 89mm
@@ -228,7 +238,7 @@ class SPBars:
                 # and 5mm for each sample
                 height = max(30, (5 * len(self.seq_count_df.index)))
                 width = 89
-                fig = plt.figure(figsize=self._mm2inch((height, width)))
+                self.fig = plt.figure(figsize=self._mm2inch((height, width)))
             gs = gridspec.GridSpec(1, 2)
             self.bar_ax = plt.subplot(gs[:, :1])
             self.leg_ax_one = plt.subplot(gs[:, 1:2])
@@ -236,14 +246,14 @@ class SPBars:
             # Then we want the bar plot to sit above the legend plot
             if figsize:
                 # TODO enforce a minimum size
-                fig = plt.figure(figsize=self._mm2inch(figsize))
+                self.fig = plt.figure(figsize=self._mm2inch(figsize))
             else:
                 # Deduce the fig size automatically
                 # width will be two columns so 183
                 # height will be fixed, 30 for legend 50 for bars
                 height = 80
                 width = 183
-                fig = plt.figure(figsize=self._mm2inch((height, width)))
+                self.fig = plt.figure(figsize=self._mm2inch((height, width)))
                 # TODO implement multiple rows of barplots
             gs = gridspec.GridSpec(2, 1)
             self.bar_ax = plt.subplot(gs[:1, :])
@@ -257,7 +267,7 @@ class SPBars:
             # The profile legend will span the bottom half
             if figsize:
                 # TODO enforce a minimum size
-                fig = plt.figure(figsize=self._mm2inch(figsize))
+                self.fig = plt.figure(figsize=self._mm2inch(figsize))
             else:
                 # Deduce the fig size automatically
                 # width will be one column so 89mm
@@ -266,7 +276,7 @@ class SPBars:
                 # and 5mm for each sample
                 height = max(60, (5 * len(self.seq_count_df.index)))
                 width = 89
-                fig = plt.figure(figsize=self._mm2inch((height, width)))
+                self.fig = plt.figure(figsize=self._mm2inch((height, width)))
             gs = gridspec.GridSpec(2, 2)
             self.bar_ax = plt.subplot(gs[:2, :1])
             self.leg_ax_one = plt.subplot(gs[:1, 1:2])
@@ -279,14 +289,14 @@ class SPBars:
             # The profile legend will span the right half
             if figsize:
                 # TODO enforce a minimum size
-                fig = plt.figure(figsize=self._mm2inch(figsize))
+                self.fig = plt.figure(figsize=self._mm2inch(figsize))
             else:
                 # Deduce the fig size automatically
                 # width will be two columns so 183
                 # height will be fixed, 30 for legend 50 for bars
                 height = 80
                 width = 183
-                fig = plt.figure(figsize=self._mm2inch((height, width)))
+                self.fig = plt.figure(figsize=self._mm2inch((height, width)))
                 # TODO implement multiple rows of barplots
             gs = gridspec.GridSpec(2, 2)
             self.bar_ax = plt.subplot(gs[:1, :2])
