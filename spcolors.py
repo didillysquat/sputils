@@ -1,10 +1,10 @@
 """
-A utility module that will hold the standardized SymPortal colour schemes and tools
+A utility module that will hold the standardized SymPortal color schemes and tools
 """
 import random
 
 # These are the top 40 most abundnant named sequences in the SymPortal db.
-# They have a colour hardcoded to them.
+# They have a color hardcoded to them.
 pre_def_color_dict = {
     'A1': "#FFFF00", 'C3': "#1CE6FF", 'C15': "#FF34FF", 'A1bo': "#FF4A46", 'D1': "#008941",
     'C1': "#006FA6", 'C27': "#A30059", 'D4': "#FFDBE5", 'C3u': "#7A4900", 'C42.2': "#0000A6",
@@ -18,7 +18,7 @@ pre_def_color_dict = {
 
 # These are the colors used by SymPortal to represent sequences that are not in the pre_def_color_dict
 # This list does not contain colors used in the pre_def_color_dict
-colour_list = [
+color_list = [
     "#FFB500", "#C2FFED", "#A079BF", "#CC0744", "#C0B9B2", "#C2FF99", "#001E09", "#00489C", "#6F0062",
     "#0CBD66",
     "#EEC3FF", "#456D75", "#B77B68", "#7A87A1", "#788D66", "#885578", "#FAD09F", "#FF8A9A", "#D157A0",
@@ -69,16 +69,16 @@ colour_list = [
 greys = ['#D0CFD4', '#89888D', '#4A4A4C', '#8A8C82', '#D4D5D0', '#53544F']
 
 
-def create_colour_list(
+def create_color_list(
         sq_dist_cutoff=None, mix_col=None, num_cols=50, time_out_iterations=10000,
-        avoid_black_and_white=True, error_on_fail=False
+        avoid_black_and_white=True, error_on_fail=False, warnings_off=False
 ):
     """
     Returns a random list of colors in a format that can be used for plotting in matplotlib.
 
     :param sq_dist_cutoff: A minimum distance between colors. [None]
 
-    :param mix_col: A color that all generated colours will be 'mixed' with. This is often set to white to make
+    :param mix_col: A color that all generated colors will be 'mixed' with. This is often set to white to make
     pastel colors for representing ITS2 type profile colors. [None]
 
     :param num_cols: The number of colors to be generated [50]
@@ -94,12 +94,16 @@ def create_colour_list(
     :param error_on_fail: Whether to raise a RuntimeError if the color list cannot be generated using the above params.
     see time_out_iterations. [False]
 
+    :param warnings_off: Whether to raise RuntimeWarning when reducing the number of
+    time_out_iterations after failing to generate the requested number of colors.
+    If True, no RuntimeWarning will be raised. [False]
+
     :return: A list of colors as tuples of R, G, B values that can be used for plotting in matplotlib.
 
     Example usage:
-    colour_palette_pas_gen = (
+    color_palette_pas_gen = (
                                 '#%02x%02x%02x' % rgb_tup for rgb_tup in
-                                self._create_colour_list(
+                                self._create_color_list(
                                     mix_col=(255, 255, 255),
                                     sq_dist_cutoff=5000,
                                     num_cols=8,
@@ -107,30 +111,31 @@ def create_colour_list(
                                 )
                             )
     """
-    new_colours = []
+    new_colors = []
     min_dist = []
     attempt = 0
-    while len(new_colours) < num_cols:
+    while len(new_colors) < num_cols:
         attempt += 1
-        # Check to see if we have run out of iteration attempts to find a colour that fits into the colour space
+        # Check to see if we have run out of iteration attempts to find a color that fits into the color space
         if attempt > time_out_iterations:
             if error_on_fail:
                 raise RuntimeError(
-                    f'Colour generation timed out. We have tried {attempt} iterations of colour generation '
-                    'and have not been able to find a colour that fits into your defined colour space.\n'
-                    'Please lower the number of colours you are trying to find, '
+                    f'Colour generation timed out. We have tried {attempt} iterations of color generation '
+                    'and have not been able to find a color that fits into your defined color space.\n'
+                    'Please lower the number of colors you are trying to find, '
                     'the minimum distance between them, or both.')
             else:
                 # Reduce the sq_dist_cutoff by 10% and reset attempts and continue to try
                 old_sq_dist_cutoff = sq_dist_cutoff
                 sq_dist_cutoff = int(sq_dist_cutoff - (sq_dist_cutoff * 0.1))
                 attempt = 0
-                raise RuntimeWarning(
-                    f'We have tried {attempt} iterations of colour generation '
-                    f'and have not been able to find a colour that fits into your defined colour space.\n'
-                    f'Automatically lowering your distance from {old_sq_dist_cutoff} to {sq_dist_cutoff}.\n'
-                    f'Continuing with color generation'
-                )
+                if not warnings_off:
+                    raise RuntimeWarning(
+                        f'We have tried {attempt} iterations of color generation '
+                        f'and have not been able to find a color that fits into your defined color space.\n'
+                        f'Automatically lowering your distance from {old_sq_dist_cutoff} to {sq_dist_cutoff}.\n'
+                        f'Continuing with color generation'
+                    )
         if mix_col:
             r = int((random.randint(0, 255) + mix_col[0]) / 2)
             g = int((random.randint(0, 255) + mix_col[1]) / 2)
@@ -140,14 +145,14 @@ def create_colour_list(
             g = random.randint(0, 255)
             b = random.randint(0, 255)
 
-        # now check to see whether the new colour is within a given distance
+        # now check to see whether the new color is within a given distance
         # if the avoids are true also
         good_dist = True
         if sq_dist_cutoff:
             dist_list = []
-            for i in range(len(new_colours)):
-                distance = (new_colours[i][0] - r) ** 2 + (new_colours[i][1] - g) ** 2 + (
-                        new_colours[i][2] - b) ** 2
+            for i in range(len(new_colors)):
+                distance = (new_colors[i][0] - r) ** 2 + (new_colors[i][1] - g) ** 2 + (
+                        new_colors[i][2] - b) ** 2
                 dist_list.append(distance)
                 if distance < sq_dist_cutoff:
                     good_dist = False
@@ -161,7 +166,7 @@ def create_colour_list(
             if dist_list:
                 min_dist.append(min(dist_list))
         if good_dist:
-            new_colours.append((r, g, b))
+            new_colors.append((r, g, b))
             attempt = 0
 
-    return new_colours
+    return new_colors
