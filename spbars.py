@@ -74,13 +74,18 @@ class SPBars:
             orientation='h', legend=True,
             relative_abundnce=True, num_seq_leg_cols=20, num_profile_leg_cols=20):
 
+        # arguments that will be used throughout the class
+        self.plot_type = plot_type
+        self.orientation = orientation
+        self.legend = True
+
         # Check the inputs
         self._check_path_exists([seq_count_table_path, profile_count_table_path])
-        if plot_type not in ['seq_only', 'profile_only', 'seq_and_profile']:
+        if self.plot_type not in ['seq_only', 'profile_only', 'seq_and_profile']:
             raise RuntimeError("plot_type must be one of 'seq_only', 'profile_only', or 'seq_and_profile'")
-        if orientation not in ['h', 'v', 'horizontal', 'vertical']:
+        if self.orientation not in ['h', 'v', 'horizontal', 'vertical']:
             raise RuntimeError("orientation must be one of 'h', 'v', 'horizontal', or 'vertical' ")
-        if not type(legend) == bool:
+        if not type(self.legend) == bool:
             raise RuntimeError("legend should be a bool")
         if (
                 (sample_uids_included is not None or sample_uids_excluded is not None) and
@@ -95,10 +100,9 @@ class SPBars:
             raise RuntimeError(
                 "Please provide only one of sample_name_compiled_re_included or sample_name_compiled_re_excluded"
             )
-        self._check_valid_params(plot_type, profile_count_table_path, seq_count_table_path)
+        self._check_valid_params(profile_count_table_path, seq_count_table_path)
 
         if seq_count_table_path:
-
             (
                 self.sample_name_to_sample_uid_dict,
                 self.sample_uid_to_sample_name_dict,
@@ -108,19 +112,76 @@ class SPBars:
                 sample_uids_included, sample_uids_excluded,
                 sample_name_compiled_re_included, sample_name_compiled_re_excluded
             )
+        if profile_count_table_path:
+            # TODO make the profile df
+            self.profile_count_df = pd.Dataframe()
 
         # Figure setup
-        self._setup_fig_and_ax(figsize, legend, orientation, plot_type)
+        self._setup_fig_and_ax(figsize)
+
+        # Patch setup
+        # List for holding the rectangle patches used in making the bars
+        self.bar_patches = []
 
         # Plotting colors setup
         self.grey_iterator = itertools.cycle(spcolors.greys)
         if plot_type in ['seq_only', 'seq_and_profile']:
+            self.num_seq_leg_cols = num_seq_leg_cols
             self.colour_hash_iterator = iter(spcolors.colour_list)
             self.pre_def_seq_colour_dict = spcolors.pre_def_color_dict
             self.seq_color_dict = self._make_seq_colour_dict()
+        if plot_type in ['profile_only', 'seq_and_profile']:
+            self.num_profile_leg_cols = num_profile_leg_cols
+            self.profile_col_generator = (
+                '#%02x%02x%02x' % rgb_tup for rgb_tup in
+                spcolors.create_colour_list(
+                    mix_col=(255, 255, 255),
+                    sq_dist_cutoff=5000,
+                    num_cols=self.num_profile_leg_cols,
+                    time_out_iterations=10000,
+                    warnings_off=True)
+            )
+            self._make_profile_color_dict()
+
+    def _make_profile_color_dict(self):
+        prof_color_dict = {}
+        for prof_uid in list(self.profile_count_df):
+            try:
+                prof_color_dict[prof_uid] = next(self.profile_col_generator)
+            except StopIteration:
+                prof_color_dict[prof_uid] = next(self.grey_iterator)
+        return prof_color_dict
+
 
         # TODO setup colors for profiles
         foo = 'bar'
+
+    def plot(self):
+        if self.plot_type in ['seq_only', 'profile_only']:
+            x_index_for_plot = 0
+            colour_list = []
+            for sample_uid in sample_uids:
+                bottom = 0
+                non_zero_seq_abundances = self.sp_seq_rel_abund_df.loc[sample_uid][
+                    self.sp_seq_rel_abund_df.loc[sample_uid] > 0]
+                for seq_uid, rel_abund in non_zero_seq_abundances.iteritems():
+                    self.bar_patches.append(Rectangle(
+                        (x_index_for_plot - 0.5, bottom),
+                        1,
+                        rel_abund, color=self.seq_color_dict[seq_uid]))
+                    bottom += rel_abund
+                    colour_list.append(self.seq_color_dict[seq_uid])
+                x_index_for_plot += 1
+            listed_colour_map = ListedColormap(colour_list)
+            patches_collection = PatchCollection(self.bar_patches, cmap=listed_colour_map)
+            patches_collection.set_array(np.arange(len(self.bar_patches)))
+            self.bar_ax.add_collection(patches_collection)
+            self.bar_ax.autoscale_view()
+            self.fig.canvas.draw()
+            raise NotImplemented
+        elif self.plot_type == 'profile_only':
+            raise NotImplemented
+
 
     def _make_seq_colour_dict(self):
         seq_color_dict = {}
@@ -134,29 +195,26 @@ class SPBars:
                     seq_color_dict[seq_name] = next(self.grey_iterator)
         return seq_color_dict
 
-    def _setup_fig_and_ax(self, figsize, legend, orientation, plot_type):
+    def _setup_fig_and_ax(self, figsize):
         """
         Setup up the ax objects that the plot and legends will be plotted to.
 
         :param figsize: user supplied figure size tuple(<int>, <int>) in mm
-        :param legend: bool whether to plot a legend
-        :param orientation: orientation of the plot either vertical or horizontal
-        :param plot_type: 'seq_only', 'profile_only', 'seq_and_profile'
 
         :return: None. But, self.bar_ax, self.leg_ax_one and self.leg_ax_two (if plot_type is 'seq_and_profile')
         will be set.
         """
-        if legend:
+        if self.legend:
             # Then we need to produce axes for the legends
-            if plot_type == 'seq_and_profile':
+            if self.plot_type == 'seq_and_profile':
                 # Then we need to have two legend axes
-                self._setup_seq_and_profile(figsize, orientation)
+                self._setup_seq_and_profile(figsize)
             else:
                 # Then we are working with a single legend
-                self._setup_seq_or_profile_only_plot(figsize, orientation)
+                self._setup_seq_or_profile_only_plot(figsize)
 
-    def _setup_seq_or_profile_only_plot(self, figsize, orientation):
-        if orientation in ['v', 'vertical']:
+    def _setup_seq_or_profile_only_plot(self, figsize):
+        if self.orientation in ['v', 'vertical']:
             # Then we want the bar plot to sit next to the legend plots
             # The bars will span the full height of the figure
             if figsize:
@@ -191,8 +249,8 @@ class SPBars:
             self.bar_ax = plt.subplot(gs[:1, :])
             self.leg_ax_one = plt.subplot(gs[1:2, :])
 
-    def _setup_seq_and_profile(self, figsize, orientation):
-        if orientation in ['v', 'vertical']:
+    def _setup_seq_and_profile(self, figsize):
+        if self.orientation in ['v', 'vertical']:
             # Then we want the bar plot to sit next to the legend plots
             # The bars will span the full height of the figure
             # The seq legend will span the top half
@@ -366,10 +424,10 @@ class SPBars:
                 return first_seq_index
         raise RuntimeError('No valid sequence column found in df')
 
-    def _check_valid_params(self, plot_type, profile_count_table_path, seq_count_table_path):
+    def _check_valid_params(self, profile_count_table_path, seq_count_table_path):
         if seq_count_table_path is None and profile_count_table_path is None:
             raise RuntimeError("Please provide either a seq_count_table_path or a profile_count_table_path")
-        if plot_type is None:
+        if self.plot_type is None:
             raise RuntimeError(
                 "Please provide either a valid plot_type. Either seq_only, profile_only, or seq_and_profile"
             )
