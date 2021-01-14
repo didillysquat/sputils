@@ -155,43 +155,58 @@ class SPBars:
         foo = 'bar'
 
     def plot(self):
-        if self.plot_type =='seq_only':
-            self._plot_bars_horizontal_single_type(self.seq_color_dict, self.seq_count_df)
-        elif self.plot_type == 'profile_only':
-            self._plot_bars_horizontal_single_type(self.profile_color_dict, self.profile_count_df)
-        elif self.plot_type == 'profile_only':
-            raise NotImplemented
+        self._plot_bars()
 
-    def _plot_bars_horizontal_single_type(self, color_dict, df):
+    def _plot_bars(self):
         """
-        Plots every instance of a sequence or profile on a per sample basis.
-        Each sample is a horizontal stacked bar, with each rectangle of the stack representing
-        a profile or sequences instance in that sample.
+            Plots every instance of a sequence or profile on a per sample basis.
+            Each sample is either a vertical or horizontal stacked bar depending on the orientation
+            with each rectangle of the stack representing
+            a profile or sequences instance in that sample.
 
-        :param color_dict: color dict used for either the sequence or profiles being plotted
-        :param df: the abundance df used for the plotting
-        :return: None
-        """
-        x_index_for_plot = 0
-        colour_list = []
-        for sample_uid in df.index:
-            bottom = 0
-            non_zero_seq_abundances = df.loc[sample_uid][
-                df.loc[sample_uid] > 0]
-            for obj_uid, abund in non_zero_seq_abundances.iteritems():
-                self.bar_patches.append(Rectangle(
-                    (x_index_for_plot - 0.5, bottom),
-                    1,
-                    abund, color=color_dict[obj_uid]))
-                bottom += abund
-                colour_list.append(color_dict[obj_uid])
-            x_index_for_plot += 1
-        listed_colour_map = ListedColormap(colour_list)
+            :param color_dict: color dict used for either the sequence or profiles being plotted
+            :param df: the abundance df used for the plotting
+            :return: None
+            """
+        color_list = []
+        if self.plot_type == 'seq_only':
+            self._make_rect_and_cols(color_dict=self.seq_color_dict, color_list=color_list, df=self.seq_count_df)
+        elif self.plot_type == 'profile_only':
+            self._make_rect_and_cols(
+                color_dict=self.profile_color_dict, color_list=color_list, df=self.profile_count_df
+            )
+        else:
+            self._make_rect_and_cols(color_dict=self.seq_color_dict, color_list=color_list, df=self.seq_count_df)
+            self._make_rect_and_cols(
+                color_dict=self.profile_color_dict, color_list=color_list, df=self.profile_count_df, pos_neg='negative'
+            )
+        listed_colour_map = ListedColormap(color_list)
         patches_collection = PatchCollection(self.bar_patches, cmap=listed_colour_map)
         patches_collection.set_array(np.arange(len(self.bar_patches)))
         self.bar_ax.add_collection(patches_collection)
         self.bar_ax.autoscale_view()
         self.fig.canvas.draw()
+
+    def _make_rect_and_cols(self, color_dict, color_list, df, pos_neg='positive'):
+        index_for_plot = 0
+        for sample_uid in df.index:
+            bottom = 0
+            non_zero_seq_abundances = df.loc[sample_uid][
+                df.loc[sample_uid] > 0]
+            if pos_neg == 'negative':
+                non_zero_seq_abundances = non_zero_seq_abundances * -1
+            for obj_uid, abund in non_zero_seq_abundances.iteritems():
+                if self.orientation == 'vertical':
+                    coords = (index_for_plot - 0.5, bottom)
+                else:
+                    coords = (bottom, index_for_plot - 0.5)
+                self.bar_patches.append(Rectangle(
+                    coords,
+                    1,
+                    abund, color=color_dict[obj_uid]))
+                bottom += abund
+                color_list.append(color_dict[obj_uid])
+            index_for_plot += 1
 
     def _make_seq_colour_dict(self):
         seq_color_dict = {}
