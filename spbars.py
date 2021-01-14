@@ -1,49 +1,4 @@
 #!/usr/bin/env python3
-"""
-A utility script for creating stacked bar plots from SymPortal output documents.
-It will produce sequence only, ITS2 type profile only, or a combination type plot.
-It will return a tuple of a matplotlib.pyplot.figure and matplotlib.axes.Axes objects.
-It will have the option to plot the output or not, i.e. to be used as a script.
-It should have a few basic options such as orientation.
-
-Parameters:
-
-    seq_count_table_path (str): The full path to the 'absolute.abund_and_meta' post-MED sequence count table
-    to use for plotting. N.B. Plotting of the pre-MED count table is currently not supported.
-
-    profile_count_table_path (str): The full path to the absolute 'abund_and_meta' ITS2 type profile count table
-    to use for plotting.
-
-    plot_type (str): A string denoting what type of plot to produce. 'seq_only, 'profile_only', 'seq_and_profile'.
-    ['seq_only']
-
-    ax (matplotlib.axes.Axes): if passed, the plot will be done on the provided ax object.
-    If None, a fig and ax will be generated and returned. [None]
-
-    figsize (tuple): A tuple that will be passed to the plt.figure figure creation. Units should be in mm.
-    If not provided this will automatically deduced. [None]
-
-    sample_uids_included (list<int>): A list of the sample uids that should be plotted.
-    The samples will be plotted in this order.[None]
-
-    sample_uids_excluded (list<int>): A list of the sample uids that should be excluded from plotting. [None]
-
-    sample_name_compiled_re_included (compiled regex): A regular expression, which if matched by a sample name,
-    will denote that the sample should be included in plotting. [None]
-
-    sample_name_compiled_re_included (compiled regex): A regular expression, which if matched by a sample name,
-    will denote that the sample should be included in plotting. [None]
-
-    orientation (str): 'vertical' or 'horizontal'. 'v' or 'h' may be passed. ['h']
-
-    legend (bool): whether to plot a legend
-
-    relative_abundnce (bool): whether to plot the abundances as relative or absolute [True]
-
-Returns:
-    tuple(matplotlib.pyplot.figure, matplotlib.axes.Axes): The figure and axes object that contain the plot
-
-"""
 
 import os
 import pandas as pd
@@ -56,14 +11,68 @@ from matplotlib.collections import PatchCollection
 from matplotlib.colors import ListedColormap
 from datetime import datetime
 import re
+import matplotlib.gridspec as gridspec
+import spcolors
+import itertools
 
 class SPBars:
+    """
+    A utility script for creating stacked bar plots from SymPortal output documents.
+    It will produce sequence only, ITS2 type profile only, or a combination type plot.
+    It will return a tuple of a matplotlib.pyplot.figure and matplotlib.axes.Axes objects.
+    It will have the option to plot the output or not, i.e. to be used as a script.
+    It should have a few basic options such as orientation.
+
+    Parameters:
+
+        seq_count_table_path (str): The full path to the 'absolute.abund_and_meta' post-MED sequence count table
+        to use for plotting. N.B. Plotting of the pre-MED count table is currently not supported.
+
+        profile_count_table_path (str): The full path to the absolute 'abund_and_meta' ITS2 type profile count table
+        to use for plotting.
+
+        plot_type (str): A string denoting what type of plot to produce. 'seq_only, 'profile_only', 'seq_and_profile'.
+        ['seq_only']
+
+        ax (matplotlib.axes.Axes): if passed, the plot will be done on the provided ax object.
+        If None, a fig and ax will be generated and returned. [None]
+
+        figsize (tuple): A tuple that will be passed to the plt.figure figure creation. Units should be in mm.
+        If not provided this will automatically deduced. [None]
+
+        sample_uids_included (list<int>): A list of the sample uids that should be plotted.
+        The samples will be plotted in this order.[None]
+
+        sample_uids_excluded (list<int>): A list of the sample uids that should be excluded from plotting. [None]
+
+        sample_name_compiled_re_included (compiled regex): A regular expression, which if matched by a sample name,
+        will denote that the sample should be included in plotting. [None]
+
+        sample_name_compiled_re_included (compiled regex): A regular expression, which if matched by a sample name,
+        will denote that the sample should be included in plotting. [None]
+
+        orientation (str): 'vertical' or 'horizontal'. 'v' or 'h' may be passed. ['h']
+
+        legend (bool): whether to plot a legend
+
+        relative_abundnce (bool): whether to plot the abundances as relative or absolute [True]
+
+        num_seq_leg_cols (int): The number of sequences to plot in the legend. Sequences will be plotted in order
+        of abundance. [20]
+
+        num_profile_leg_cols (int): The number of profiles to plot in the legend. Sequences will be plotted in order
+        of abundance. [20]
+
+    Returns:
+        tuple(matplotlib.pyplot.figure, matplotlib.axes.Axes): The figure and axes object that contain the plot
+
+    """
     def __init__(
             self, seq_count_table_path=None, profile_count_table_path=None, plot_type='seq', figsize=None,
             sample_uids_included=None, sample_uids_excluded=None,
             sample_name_compiled_re_included=None, sample_name_compiled_re_excluded=None,
             orientation='h', legend=True,
-            relative_abundnce=True):
+            relative_abundnce=True, num_seq_leg_cols=20, num_profile_leg_cols=20):
 
         # Check the inputs
         self._check_path_exists([seq_count_table_path, profile_count_table_path])
@@ -99,40 +108,132 @@ class SPBars:
                 sample_uids_included, sample_uids_excluded,
                 sample_name_compiled_re_included, sample_name_compiled_re_excluded
             )
-            # TODO make checks for the sample uids or sample names to make sure taht they are in the df produced
-            # TODO remove any exclude sequences
 
         # Figure setup
-        self.fig, self.ac = self._setup_fig_and_ax(figsize, legend, orientation)
+        self._setup_fig_and_ax(figsize, legend, orientation, plot_type)
 
+        # Plotting colors setup
+        self.grey_iterator = itertools.cycle(spcolors.greys)
+        if plot_type in ['seq_only', 'seq_and_profile']:
+            self.colour_hash_iterator = iter(spcolors.colour_list)
+            self.pre_def_seq_colour_dict = spcolors.pre_def_color_dict
+            self.seq_color_dict = self._make_seq_colour_dict()
 
-
+        # TODO setup colors for profiles
         foo = 'bar'
 
-    def _setup_fig_and_ax(self, figsize, legend, orientation):
-        if figsize is not None:
-            fig, ax = plt.figure(figsize=self._mm2inch(figsize))
-        else:
-            if orientation in ['v', 'vertical']:
-                # if vertical, 5mm height per sample on top of base 30mm for legend
-                height = 0
-                if legend:
-                    height += 30
-                height += (len(self.seq_count_df.index) * 5)
-                # If plotting vertical then set width at one column i.e. 89mm
-                width = 89
+    def _make_seq_colour_dict(self):
+        seq_color_dict = {}
+        for seq_name in list(self.seq_count_df):
+            if seq_name in self.pre_def_seq_colour_dict:
+                seq_color_dict[seq_name] = self.pre_def_seq_colour_dict[seq_name]
             else:
-                # TODO build in the ability to have the bars plotted in multiple rows.
-                # horizontal
-                # height will be set constant 30mm for height and 50 mm for bars
-                # width will be either 89 or 183
-                if len(self.seq_count_df.index) > 20:
-                    width = 183
-                else:
-                    width = 89
+                try:
+                    seq_color_dict[seq_name] = next(self.colour_hash_iterator)
+                except StopIteration:
+                    seq_color_dict[seq_name] = next(self.grey_iterator)
+        return seq_color_dict
+
+    def _setup_fig_and_ax(self, figsize, legend, orientation, plot_type):
+        """
+        Setup up the ax objects that the plot and legends will be plotted to.
+
+        :param figsize: user supplied figure size tuple(<int>, <int>) in mm
+        :param legend: bool whether to plot a legend
+        :param orientation: orientation of the plot either vertical or horizontal
+        :param plot_type: 'seq_only', 'profile_only', 'seq_and_profile'
+
+        :return: None. But, self.bar_ax, self.leg_ax_one and self.leg_ax_two (if plot_type is 'seq_and_profile')
+        will be set.
+        """
+        if legend:
+            # Then we need to produce axes for the legends
+            if plot_type == 'seq_and_profile':
+                # Then we need to have two legend axes
+                self._setup_seq_and_profile(figsize, orientation)
+            else:
+                # Then we are working with a single legend
+                self._setup_seq_or_profile_only_plot(figsize, orientation)
+
+    def _setup_seq_or_profile_only_plot(self, figsize, orientation):
+        if orientation in ['v', 'vertical']:
+            # Then we want the bar plot to sit next to the legend plots
+            # The bars will span the full height of the figure
+            if figsize:
+                # TODO enforce a minimum size
+                fig = plt.figure(figsize=self._mm2inch(figsize))
+            else:
+                # Deduce the fig size automatically
+                # width will be one column so 89mm
+                # height will dependent on sample number
+                # We will need a min height for the one legend of 30
+                # and 5mm for each sample
+                height = max(30, (5 * len(self.seq_count_df.index)))
+                width = 89
+                fig = plt.figure(figsize=self._mm2inch((height, width)))
+            gs = gridspec.GridSpec(1, 2)
+            self.bar_ax = plt.subplot(gs[:, :1])
+            self.leg_ax_one = plt.subplot(gs[:, 1:2])
+        else:
+            # Then we want the bar plot to sit above the legend plot
+            if figsize:
+                # TODO enforce a minimum size
+                fig = plt.figure(figsize=self._mm2inch(figsize))
+            else:
+                # Deduce the fig size automatically
+                # width will be two columns so 183
+                # height will be fixed, 30 for legend 50 for bars
                 height = 80
-            fig, ax = plt.figure(figsize=self._mm2inch(height, width))
-        return fig, ax
+                width = 183
+                fig = plt.figure(figsize=self._mm2inch((height, width)))
+                # TODO implement multiple rows of barplots
+            gs = gridspec.GridSpec(2, 1)
+            self.bar_ax = plt.subplot(gs[:1, :])
+            self.leg_ax_one = plt.subplot(gs[1:2, :])
+
+    def _setup_seq_and_profile(self, figsize, orientation):
+        if orientation in ['v', 'vertical']:
+            # Then we want the bar plot to sit next to the legend plots
+            # The bars will span the full height of the figure
+            # The seq legend will span the top half
+            # The profile legend will span the bottom half
+            if figsize:
+                # TODO enforce a minimum size
+                fig = plt.figure(figsize=self._mm2inch(figsize))
+            else:
+                # Deduce the fig size automatically
+                # width will be one column so 89mm
+                # height will dependent on sample number
+                # We will need a min height for the legends of 30 * 2
+                # and 5mm for each sample
+                height = max(60, (5 * len(self.seq_count_df.index)))
+                width = 89
+                fig = plt.figure(figsize=self._mm2inch((height, width)))
+            gs = gridspec.GridSpec(2, 2)
+            self.bar_ax = plt.subplot(gs[:2, :1])
+            self.leg_ax_one = plt.subplot(gs[:1, 1:2])
+            self.leg_ax_two = plt.subplot(gs[1:2, 1:2])
+
+        else:
+            # Then we want the bar plot to sit above the legend plots
+            # The bars will span the full width of the figure
+            # The seq legend will span the left half
+            # The profile legend will span the right half
+            if figsize:
+                # TODO enforce a minimum size
+                fig = plt.figure(figsize=self._mm2inch(figsize))
+            else:
+                # Deduce the fig size automatically
+                # width will be two columns so 183
+                # height will be fixed, 30 for legend 50 for bars
+                height = 80
+                width = 183
+                fig = plt.figure(figsize=self._mm2inch((height, width)))
+                # TODO implement multiple rows of barplots
+            gs = gridspec.GridSpec(2, 2)
+            self.bar_ax = plt.subplot(gs[:1, :2])
+            self.leg_ax_one = plt.subplot(gs[:2, :1])
+            self.leg_ax_two = plt.subplot(gs[:2, 1:2])
 
     def _check_path_exists(self, paths):
         for path in paths:
@@ -171,9 +272,10 @@ class SPBars:
         first_seq_index = self._find_first_seq_position(seq_count_df)
         seq_count_df = seq_count_df.iloc[:, first_seq_index:]
 
-        # TODO at this point exclude samples
-        seq_count_df = self._exclude_samples_from_seq_count_df(seq_count_df, sample_uids_included, sample_uids_excluded,
-                sample_name_compiled_re_included, sample_name_compiled_re_excluded)
+        seq_count_df = self._exclude_samples_from_seq_count_df(
+            seq_count_df, sample_uids_included, sample_uids_excluded,
+            sample_name_compiled_re_included, sample_name_compiled_re_excluded
+        )
 
         # Convert to relative abundances
         if relative_abundnce:
