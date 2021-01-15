@@ -68,6 +68,26 @@ color_list = [
 # These are the standard greys used in SymPortal figure plotting for sequences
 greys = ['#D0CFD4', '#89888D', '#4A4A4C', '#8A8C82', '#D4D5D0', '#53544F']
 
+genus_color_dict = {
+                    # Pastel red
+                    'A': "#FF7F7F",
+                    # Pastel yellow
+                    'B': "#FFFF7F",
+                    # Pastel green
+                    'C': "#BFFF7F",
+                    # Pastel Blue
+                    'D': "#7F7FFF",
+                    # Pastel Purple
+                    'E': "#BF7FFF",
+                    # Pastel orange
+                    'F': "#FFBF7F",
+                    # Pastel Cyan
+                    'G': "#7FFFFF",
+                    # Pastel Magenta
+                    'H': "#FF7FFF",
+                    # Pastel light green
+                    'I': "#BFFF7F"
+                }
 
 def create_color_list(
         sq_dist_cutoff=None, mix_col=None, num_cols=50, time_out_iterations=10000,

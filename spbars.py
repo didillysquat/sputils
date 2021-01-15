@@ -70,6 +70,8 @@ class SPBars:
 
         reverse_profile_abund (bool): When True, the order in which the profiles are plotted will be reversed. [False]
 
+        color_by_genus (bool): If True, sequences and profiles will be colored according to their genus. [False]
+
     Returns:
         tuple(matplotlib.pyplot.figure, matplotlib.axes.Axes): The figure and axes object that contain the plot
 
@@ -80,7 +82,7 @@ class SPBars:
             sample_name_compiled_re_included=None, sample_name_compiled_re_excluded=None,
             orientation='h', legend=True,
             relative_abundnce=True, num_seq_leg_cols=20, num_profile_leg_cols=20, seqs_right_bottom=False,
-            reverse_seq_abund=False, reverse_profile_abund=False
+            reverse_seq_abund=False, reverse_profile_abund=False, color_by_genus=False
     ):
 
         # arguments that will be used throughout the class
@@ -90,6 +92,9 @@ class SPBars:
         self.seqs_right_bottom = seqs_right_bottom
         self.reverse_seq_abund = reverse_seq_abund
         self.reverse_profile_abund = reverse_profile_abund
+        self.color_by_genus = color_by_genus
+        self.num_profile_leg_cols = num_profile_leg_cols
+        self.num_seq_leg_cols = num_seq_leg_cols
 
         # Check the inputs
         self._check_path_exists([seq_count_table_path, profile_count_table_path])
@@ -144,32 +149,47 @@ class SPBars:
 
         # Plotting colors setup
         self.grey_iterator = itertools.cycle(spcolors.greys)
+        self.genus_color_dict = spcolors.genus_color_dict
+
         if plot_type in ['seq_only', 'seq_and_profile']:
-            self.num_seq_leg_cols = num_seq_leg_cols
-            self.color_hash_iterator = iter(spcolors.color_list)
-            self.pre_def_seq_color_dict = spcolors.pre_def_color_dict
+            # TODO we will only need one legend if we are coloring by genus
+            if not self.color_by_genus:
+                self.color_hash_iterator = iter(spcolors.color_list)
+                self.pre_def_seq_color_dict = spcolors.pre_def_color_dict
             self.seq_color_dict = self._make_seq_color_dict()
+
         if plot_type in ['profile_only', 'seq_and_profile']:
-            self.num_profile_leg_cols = num_profile_leg_cols
-            self.profile_col_generator = (
-                '#%02x%02x%02x' % rgb_tup for rgb_tup in
-                spcolors.create_color_list(
-                    mix_col=(255, 255, 255),
-                    sq_dist_cutoff=5000,
-                    num_cols=self.num_profile_leg_cols,
-                    time_out_iterations=10000,
-                    warnings_off=True)
-            )
+            if not self.color_by_genus:
+                self.profile_col_generator = (
+                    '#%02x%02x%02x' % rgb_tup for rgb_tup in
+                    spcolors.create_color_list(
+                        mix_col=(255, 255, 255),
+                        sq_dist_cutoff=5000,
+                        num_cols=self.num_profile_leg_cols,
+                        time_out_iterations=10000,
+                        warnings_off=True)
+                )
             self.profile_color_dict = self._make_profile_color_dict()
 
     def _make_profile_color_dict(self):
         prof_color_dict = {}
-        for prof_uid in list(self.profile_count_df):
-            try:
-                prof_color_dict[prof_uid] = next(self.profile_col_generator)
-            except StopIteration:
-                prof_color_dict[prof_uid] = next(self.grey_iterator)
-        return prof_color_dict
+        if self.color_by_genus:
+            for clade in list('ABCDEFGI'):
+                clade_col = self.genus_color_dict[clade]
+                prof_color_dict.update(
+                    {
+                        prof_uid: clade_col for prof_uid in list(self.profile_count_df) if
+                        self.profile_uid_to_profile_name_dict[prof_uid].startswith(clade)
+                    }
+                )
+            return prof_color_dict
+        else:
+            for prof_uid in list(self.profile_count_df):
+                try:
+                    prof_color_dict[prof_uid] = next(self.profile_col_generator)
+                except StopIteration:
+                    prof_color_dict[prof_uid] = next(self.grey_iterator)
+            return prof_color_dict
 
     def plot(self):
         self._plot_bars()
@@ -240,15 +260,26 @@ class SPBars:
 
     def _make_seq_color_dict(self):
         seq_color_dict = {}
-        for seq_name in list(self.seq_count_df):
-            if seq_name in self.pre_def_seq_color_dict:
-                seq_color_dict[seq_name] = self.pre_def_seq_color_dict[seq_name]
-            else:
-                try:
-                    seq_color_dict[seq_name] = next(self.color_hash_iterator)
-                except StopIteration:
-                    seq_color_dict[seq_name] = next(self.grey_iterator)
-        return seq_color_dict
+        if self.color_by_genus:
+            for clade in list('ABCDEFGI'):
+                clade_col = self.genus_color_dict[clade]
+                seq_color_dict.update(
+                    {
+                        seq_name: clade_col for seq_name in list(self.seq_count_df) if
+                        (seq_name.startswith(clade) or seq_name.endswith(clade))
+                    }
+                )
+            return seq_color_dict
+        else:
+            for seq_name in list(self.seq_count_df):
+                if seq_name in self.pre_def_seq_color_dict:
+                    seq_color_dict[seq_name] = self.pre_def_seq_color_dict[seq_name]
+                else:
+                    try:
+                        seq_color_dict[seq_name] = next(self.color_hash_iterator)
+                    except StopIteration:
+                        seq_color_dict[seq_name] = next(self.grey_iterator)
+            return seq_color_dict
 
     def _setup_fig_and_ax(self, figsize):
         """
@@ -585,5 +616,5 @@ class SPBars:
 SPBars(
     seq_count_table_path='/Users/benjaminhume/Documents/projects/20210113_buitrago/sp_output/post_med_seqs/131_20201203_DBV_20201207T095144.seqs.absolute.abund_and_meta.txt',
     profile_count_table_path='/Users/benjaminhume/Documents/projects/20210113_buitrago/sp_output/its2_type_profiles/131_20201203_DBV_20201207T095144.profiles.absolute.abund_and_meta.txt',
-    plot_type='seq_and_profile', orientation='v', legend=False, relative_abundnce=True
+    plot_type='seq_only', orientation='v', legend=False, relative_abundnce=True, color_by_genus=True
 ).plot()
