@@ -63,6 +63,13 @@ class SPBars:
         num_profile_leg_cols (int): The number of profiles to plot in the legend. Sequences will be plotted in order
         of abundance. [20]
 
+        seqs_right_bottom (bool): When True, for seq_and_profile plots the sequences will be plotted to the right of the
+        profiles for vertical plots, and below the profiles for horizontal plots. [False]
+
+        reverse_seq_abund (bool): When True, the order in which the sequences are plotted will be reversed. [False]
+
+        reverse_profile_abund (bool): When True, the order in which the profiles are plotted will be reversed. [False]
+
     Returns:
         tuple(matplotlib.pyplot.figure, matplotlib.axes.Axes): The figure and axes object that contain the plot
 
@@ -72,12 +79,17 @@ class SPBars:
             sample_uids_included=None, sample_uids_excluded=None,
             sample_name_compiled_re_included=None, sample_name_compiled_re_excluded=None,
             orientation='h', legend=True,
-            relative_abundnce=True, num_seq_leg_cols=20, num_profile_leg_cols=20):
+            relative_abundnce=True, num_seq_leg_cols=20, num_profile_leg_cols=20, seqs_right_bottom=False,
+            reverse_seq_abund=False, reverse_profile_abund=False
+    ):
 
         # arguments that will be used throughout the class
         self.plot_type = plot_type
         self.orientation = orientation
-        self.legend = True
+        self.legend = legend
+        self.seqs_right_bottom = seqs_right_bottom
+        self.reverse_seq_abund = reverse_seq_abund
+        self.reverse_profile_abund = reverse_profile_abund
 
         # Check the inputs
         self._check_path_exists([seq_count_table_path, profile_count_table_path])
@@ -183,10 +195,18 @@ class SPBars:
                 color_dict=self.profile_color_dict, color_list=color_list, df=self.profile_count_df
             )
         else:
-            self._make_rect_and_cols(color_dict=self.seq_color_dict, color_list=color_list, df=self.seq_count_df)
-            self._make_rect_and_cols(
-                color_dict=self.profile_color_dict, color_list=color_list, df=self.profile_count_df, pos_neg='negative'
-            )
+            if self.seqs_right_bottom:
+                self._make_rect_and_cols(color_dict=self.seq_color_dict, color_list=color_list, df=self.seq_count_df,
+                                         pos_neg='positive')
+                self._make_rect_and_cols(
+                    color_dict=self.profile_color_dict, color_list=color_list, df=self.profile_count_df,
+                    pos_neg='negative'
+                )
+            else:
+                self._make_rect_and_cols(color_dict=self.seq_color_dict, color_list=color_list, df=self.seq_count_df, pos_neg='negative')
+                self._make_rect_and_cols(
+                    color_dict=self.profile_color_dict, color_list=color_list, df=self.profile_count_df, pos_neg='positive'
+                )
         listed_color_map = ListedColormap(color_list)
         patches_collection = PatchCollection(self.bar_patches, cmap=listed_color_map)
         patches_collection.set_array(np.arange(len(self.bar_patches)))
@@ -239,14 +259,12 @@ class SPBars:
         :return: None. But, self.fig, self.bar_ax, self.leg_ax_one and self.leg_ax_two (if plot_type is 'seq_and_profile')
         will be set.
         """
-        if self.legend:
-            # Then we need to produce axes for the legends
-            if self.plot_type == 'seq_and_profile':
-                # Then we need to have two legend axes
-                self._setup_seq_and_profile(figsize)
-            else:
-                # Then we are working with a single legend
-                self._setup_seq_or_profile_only_plot(figsize)
+        if self.plot_type == 'seq_and_profile':
+            # Then we need to have two legend axes if legend plotted
+            self._setup_seq_and_profile(figsize)
+        else:
+            # Then we are working with a single legend if legend plotted
+            self._setup_seq_or_profile_only_plot(figsize)
 
     def _setup_seq_or_profile_only_plot(self, figsize):
         if self.orientation in ['v', 'vertical']:
@@ -265,8 +283,11 @@ class SPBars:
                 width = 89
                 self.fig = plt.figure(figsize=self._mm2inch((width, height)))
             gs = gridspec.GridSpec(1, 2)
-            self.bar_ax = plt.subplot(gs[:, :1])
-            self.leg_ax_one = plt.subplot(gs[:, 1:2])
+            if self.legend:
+                self.bar_ax = plt.subplot(gs[:, :1])
+                self.leg_ax_one = plt.subplot(gs[:, 1:2])
+            else:
+                self.bar_ax = plt.subplot(gs[:, :])
         else:
             # Then we want the bar plot to sit above the legend plot
             if figsize:
@@ -281,8 +302,11 @@ class SPBars:
                 self.fig = plt.figure(figsize=self._mm2inch((width, height)))
                 # TODO implement multiple rows of barplots
             gs = gridspec.GridSpec(2, 1)
-            self.bar_ax = plt.subplot(gs[:1, :])
-            self.leg_ax_one = plt.subplot(gs[1:2, :])
+            if self.legend:
+                self.bar_ax = plt.subplot(gs[:1, :])
+                self.leg_ax_one = plt.subplot(gs[1:2, :])
+            else:
+                self.bar_ax = plt.subplot(gs[:, :])
 
     def _setup_seq_and_profile(self, figsize):
         if self.orientation in ['v', 'vertical']:
@@ -303,10 +327,12 @@ class SPBars:
                 width = 89
                 self.fig = plt.figure(figsize=self._mm2inch((width, height)))
             gs = gridspec.GridSpec(2, 2)
-            self.bar_ax = plt.subplot(gs[:2, :1])
-            self.leg_ax_one = plt.subplot(gs[:1, 1:2])
-            self.leg_ax_two = plt.subplot(gs[1:2, 1:2])
-
+            if self.legend:
+                self.bar_ax = plt.subplot(gs[:2, :1])
+                self.leg_ax_one = plt.subplot(gs[:1, 1:2])
+                self.leg_ax_two = plt.subplot(gs[1:2, 1:2])
+            else:
+                self.bar_ax = plt.subplot(gs[:, :])
         else:
             # Then we want the bar plot to sit above the legend plots
             # The bars will span the full width of the figure
@@ -324,9 +350,12 @@ class SPBars:
                 self.fig = plt.figure(figsize=self._mm2inch((width, height)))
                 # TODO implement multiple rows of barplots
             gs = gridspec.GridSpec(2, 2)
-            self.bar_ax = plt.subplot(gs[:1, :2])
-            self.leg_ax_one = plt.subplot(gs[1:2, :1])
-            self.leg_ax_two = plt.subplot(gs[1:2, 1:2])
+            if self.legend:
+                self.bar_ax = plt.subplot(gs[:1, :2])
+                self.leg_ax_one = plt.subplot(gs[1:2, :1])
+                self.leg_ax_two = plt.subplot(gs[1:2, 1:2])
+            else:
+                self.bar_ax = plt.subplot(gs[:, :])
 
     def _check_path_exists(self, paths):
         for path in paths:
@@ -387,7 +416,10 @@ class SPBars:
             )
 
         # sort by column abundances, highest first
-        sorted_cols = profile_count_df_abund.sum(axis=0).sort_values(ascending=False).index
+        if self.reverse_profile_abund:
+            sorted_cols = profile_count_df_abund.sum(axis=0).sort_values(ascending=False).index
+        else:
+            sorted_cols = profile_count_df_abund.sum(axis=0).sort_values(ascending=False).index
         profile_count_df_abund = profile_count_df_abund.reindex(sorted_cols, axis=1)
 
         return (
@@ -433,7 +465,10 @@ class SPBars:
             )
 
         # sort by seq abundance, highest first
-        sorted_seq_index = seq_count_df.sum(axis=0).sort_values(ascending=False).index
+        if self.reverse_seq_abund:
+            sorted_seq_index = seq_count_df.sum(axis=0).sort_values(ascending=True).index
+        else:
+            sorted_seq_index = seq_count_df.sum(axis=0).sort_values(ascending=False).index
         seq_count_df = seq_count_df.reindex(sorted_seq_index, axis=1)
 
         return (sample_name_to_sample_uid_dict, sample_uid_to_sample_name_dict, seq_count_df)
@@ -550,5 +585,5 @@ class SPBars:
 SPBars(
     seq_count_table_path='/Users/benjaminhume/Documents/projects/20210113_buitrago/sp_output/post_med_seqs/131_20201203_DBV_20201207T095144.seqs.absolute.abund_and_meta.txt',
     profile_count_table_path='/Users/benjaminhume/Documents/projects/20210113_buitrago/sp_output/its2_type_profiles/131_20201203_DBV_20201207T095144.profiles.absolute.abund_and_meta.txt',
-    plot_type='seq_only', orientation='h'
+    plot_type='seq_and_profile', orientation='v', legend=False, relative_abundnce=True
 ).plot()
