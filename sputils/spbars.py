@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import os
 import pandas as pd
 import matplotlib as mpl
@@ -9,11 +7,11 @@ import numpy as np
 from matplotlib.patches import Rectangle
 from matplotlib.collections import PatchCollection
 from matplotlib.colors import ListedColormap
-from datetime import datetime
 import re
 import matplotlib.gridspec as gridspec
-import spcolors
+from sputils import spcolors
 import itertools
+from datetime import datetime
 
 class SPBars:
     """
@@ -26,15 +24,15 @@ class SPBars:
     Parameters:
 
         seq_count_table_path (str): The full path to the 'absolute.abund_and_meta' post-MED sequence count table
-        to use for plotting. N.B. Plotting of the pre-MED count table is currently not supported.
+        to use for plotting. N.B. Plotting of the pre-MED count table is currently not supported. [None]
 
-        profile_count_table_path (str): The full path to the absolute 'abund_and_meta' ITS2 type profile count table
-        to use for plotting.
+        profile_count_table_path (str): The full path to the absolute 'absolute.abund_and_meta' ITS2 type profile count table
+        to use for plotting. [None]
 
         plot_type (str): A string denoting what type of plot to produce. 'seq_only, 'profile_only', 'seq_and_profile'.
         ['seq_only']
 
-        ax (matplotlib.axes.Axes): if passed, the plot will be done on the provided ax object.
+        bar_ax (matplotlib.axes.Axes): if passed, the plot will be done on the provided ax object.
         If None, a fig and ax will be generated and returned. [None]
 
         figsize (tuple): A tuple that will be passed to the plt.figure figure creation. Units should be in mm.
@@ -44,6 +42,11 @@ class SPBars:
         The samples will be plotted in this order.[None]
 
         sample_uids_excluded (list<int>): A list of the sample uids that should be excluded from plotting. [None]
+
+        sample_names_included (list<str>): A list of the sample names that should be plotted.
+        The samples will be plotted in this order.[None]
+
+        sample_names_excluded (list<str>): A list of the sample names that should be excluded from plotting. [None]
 
         sample_name_compiled_re_included (compiled regex): A regular expression, which if matched by a sample name,
         will denote that the sample should be included in plotting. [None]
@@ -74,6 +77,10 @@ class SPBars:
 
         sample_outline (bool): If True, each sample will be separated by a black line. [False]
 
+        save_fig (bool): If True, the plot will be saved to the cwd or to the directory given by output_dir. [False]
+
+        fig_output_dir (str): Path to the output dir where the figure will be output. [None]
+
     Returns:
         tuple(matplotlib.pyplot.figure, matplotlib.axes.Axes): The figure and axes object that contain the plot
 
@@ -81,10 +88,12 @@ class SPBars:
     def __init__(
             self, seq_count_table_path=None, profile_count_table_path=None, plot_type='seq', figsize=None,
             sample_uids_included=None, sample_uids_excluded=None,
+            sample_names_included=None, sample_names_excluded=None,
             sample_name_compiled_re_included=None, sample_name_compiled_re_excluded=None,
             orientation='h', legend=True,
             relative_abundnce=True, num_seq_leg_cols=20, num_profile_leg_cols=20, seqs_right_bottom=False,
-            reverse_seq_abund=False, reverse_profile_abund=False, color_by_genus=False, sample_outline=False
+            reverse_seq_abund=False, reverse_profile_abund=False, color_by_genus=False, sample_outline=False,
+            save_fig=False, fig_output_dir=None, bar_ax=None
     ):
 
         # arguments that will be used throughout the class
@@ -102,6 +111,10 @@ class SPBars:
         self.num_seq_leg_cols = num_seq_leg_cols
         self.relative_abundance = relative_abundnce
         self.sample_outline = sample_outline
+        self.save_fig = save_fig
+        self.fig_output_dir = fig_output_dir
+        self.date_time = str(datetime.now()).split('.')[0].replace('-', '').replace(' ', 'T').replace(':', '')
+        self.bar_ax = bar_ax
 
         # Check the inputs
         self._check_path_exists([seq_count_table_path, profile_count_table_path])
@@ -111,19 +124,13 @@ class SPBars:
             raise RuntimeError("orientation must be one of 'h', 'v', 'horizontal', or 'vertical' ")
         if not type(self.legend) == bool:
             raise RuntimeError("legend should be a bool")
-        if (
-                (sample_uids_included is not None or sample_uids_excluded is not None) and
-                (sample_name_compiled_re_included is not None or sample_name_compiled_re_excluded is not None)
-        ):
-            raise RuntimeError("please provide either uids OR sample_names to include/exclude. Not both.")
-        if sample_uids_included is not None and sample_uids_excluded is not None:
-            raise RuntimeError(
-                "Please provide only one of sample_uids_included or sample_uids_excluded"
-            )
-        if sample_name_compiled_re_included is not None and sample_name_compiled_re_excluded is not None:
-            raise RuntimeError(
-                "Please provide only one of sample_name_compiled_re_included or sample_name_compiled_re_excluded"
-            )
+        # Check that only one of the exclude arguments has been provided
+        self._check_exclude_arguments(
+            sample_name_compiled_re_excluded, sample_name_compiled_re_included,
+            sample_names_excluded, sample_names_included,
+            sample_uids_excluded, sample_uids_included
+        )
+
         self._check_valid_params(profile_count_table_path, seq_count_table_path)
 
         if seq_count_table_path:
@@ -133,7 +140,7 @@ class SPBars:
                 self.seq_count_df
             ) = self._make_seq_count_df(
                 seq_count_table_path,
-                sample_uids_included, sample_uids_excluded,
+                sample_uids_included, sample_uids_excluded, sample_names_included, sample_names_excluded,
                 sample_name_compiled_re_included, sample_name_compiled_re_excluded
             )
         if profile_count_table_path:
@@ -143,7 +150,7 @@ class SPBars:
                 self.profile_count_df
             ) = self._make_profile_count_df(
                     profile_count_table_path,
-                    sample_uids_included, sample_uids_excluded,
+                    sample_uids_included, sample_uids_excluded, sample_names_included, sample_names_excluded,
                     sample_name_compiled_re_included, sample_name_compiled_re_excluded
             )
 
@@ -178,6 +185,26 @@ class SPBars:
                 )
             self.profile_color_dict = self._make_profile_color_dict()
 
+    def _check_exclude_arguments(self, sample_name_compiled_re_excluded, sample_name_compiled_re_included,
+                                 sample_names_excluded, sample_names_included, sample_uids_excluded,
+                                 sample_uids_included):
+        c_count = 0
+        for constraint in [
+            sample_uids_included, sample_uids_excluded,
+            sample_names_included, sample_names_excluded,
+            sample_name_compiled_re_included, sample_name_compiled_re_excluded
+        ]:
+            if constraint is not None:
+                c_count += 1
+                if c_count > 1:
+                    raise RuntimeError('Please provide only one of:\n'
+                                       '\tsample_uids_included\n'
+                                       '\tsample_uids_excluded\n'
+                                       '\tsample_names_included\n'
+                                       '\tsample_names_excluded\n'
+                                       '\tsample_name_compiled_re_included\n'
+                                       '\tsample_name_compiled_re_excluded\n')
+
     def _make_profile_color_dict(self):
         if self.color_by_genus:
             return spcolors.genus_color_dict
@@ -193,9 +220,15 @@ class SPBars:
     def plot(self):
         self._plot_bars()
         plt.show()
-        plt.savefig('figure_1.svg')
-        plt.savefig('figure_1.png', dpi=1200)
-        foo = 'bar'
+        if self.save_fig:
+            if self.fig_output_dir:
+                if not os.path.exists(self.fig_output_dir):
+                    os.makedirs(self.fig_output_dir, exist_ok=True)
+                plt.savefig(os.path.join(self.fig_output_dir, f'{self.date_time}.svg'))
+                plt.savefig(os.path.join(self.fig_output_dir, f'{self.date_time}.png'), dpi=1200)
+            else:
+                plt.savefig(f'{self.date_time}.svg')
+                plt.savefig(f'{self.date_time}.png', dpi=1200)
 
     def _plot_bars(self):
         """
@@ -318,6 +351,10 @@ class SPBars:
         :return: None. But, self.fig, self.bar_ax, self.leg_ax_one and self.leg_ax_two (if plot_type is 'seq_and_profile')
         will be set.
         """
+        if self.bar_ax is not None:
+            # Then the user has provided us with an axis that we should plot to.
+            # The bar_ax will already have a fig associated to it so we don't need to generate a fig object.
+            return
         if self.plot_type == 'seq_and_profile':
             # Then we need to have two legend axes if legend plotted
             self._setup_seq_and_profile(figsize)
@@ -431,7 +468,7 @@ class SPBars:
 
     def _make_profile_count_df(
             self, profile_count_table_path,
-                sample_uids_included, sample_uids_excluded,
+                sample_uids_included, sample_uids_excluded, sample_names_included, sample_names_excluded,
                 sample_name_compiled_re_included, sample_name_compiled_re_excluded
     ):
         """
@@ -464,7 +501,7 @@ class SPBars:
 
         profile_count_df_abund = self._exclude_samples_from_count_df(
             profile_count_df_abund, sample_uid_to_sample_name_dict, sample_name_to_sample_uid_dict,
-            sample_uids_included, sample_uids_excluded,
+            sample_uids_included, sample_uids_excluded, sample_names_included, sample_names_excluded,
             sample_name_compiled_re_included, sample_name_compiled_re_excluded
         )
 
@@ -502,7 +539,7 @@ class SPBars:
 
     def _make_seq_count_df(
             self, seq_count_table_path,
-                sample_uids_included, sample_uids_excluded,
+                sample_uids_included, sample_uids_excluded, sample_names_included, sample_names_excluded,
                 sample_name_compiled_re_included, sample_name_compiled_re_excluded
     ):
         """
@@ -526,7 +563,7 @@ class SPBars:
 
         seq_count_df = self._exclude_samples_from_count_df(
             seq_count_df, sample_uid_to_sample_name_dict, sample_name_to_sample_uid_dict,
-            sample_uids_included, sample_uids_excluded,
+            sample_uids_included, sample_uids_excluded, sample_names_included, sample_names_excluded,
             sample_name_compiled_re_included, sample_name_compiled_re_excluded
         )
 
@@ -560,7 +597,7 @@ class SPBars:
 
     def _exclude_samples_from_count_df(
             self, count_df, sample_uid_to_sample_name_dict, sample_name_to_sample_uid_dict,
-            sample_uids_included, sample_uids_excluded,
+            sample_uids_included, sample_uids_excluded, sample_names_included, sample_names_excluded,
             sample_name_compiled_re_included, sample_name_compiled_re_excluded
     ):
         """
@@ -572,6 +609,12 @@ class SPBars:
             return self._exclude_samples_sample_uids_included(sample_uids_included, count_df)
         elif sample_uids_excluded is not None:
             return self._exclude_samples_sample_uids_excluded(count_df, sample_uids_excluded)
+        elif sample_names_included is not None:
+            return self._exclude_samples_samples_names_included(count_df, sample_name_to_sample_uid_dict,
+                                                         sample_names_included)
+        elif sample_names_excluded is not None:
+            return self._exclude_samples_samples_names_excluded(count_df, sample_name_to_sample_uid_dict,
+                                                         sample_names_excluded, sample_names_included)
         elif sample_name_compiled_re_included is not None:
             return self._exclude_samples_sample_name_compiled_re_included(
                 count_df, sample_name_compiled_re_included,
@@ -585,6 +628,42 @@ class SPBars:
         else:
             # Then they are all none and there are no samples to be excluded.
             return count_df
+
+    def _exclude_samples_samples_names_excluded(self, count_df, sample_name_to_sample_uid_dict, sample_names_excluded,
+                                                sample_names_included):
+        # Return df containing only the included samples sorted according to that sampple order
+        print('Excluding samples according to user supplied sample_names_included list')
+        # Check that all uids are found in the seq_count_df
+        diff_set = set(sample_names_excluded).difference(set(sample_name_to_sample_uid_dict.keys()))
+        if not set(sample_names_included).issubset(set(sample_name_to_sample_uid_dict.keys())):
+            raise RuntimeError('The following uids that were specified in the sample_uids_excluded list are not'
+                               f'found in the SymPortal count table: {diff_set}')
+        else:
+            # All samples were found in the df and those listed can be exculded
+            print(f'Excluding {len(diff_set)} samples')
+            return count_df.drop(
+                index=[sample_name_to_sample_uid_dict[sample_name] for sample_name in sample_names_excluded]
+            )
+
+    def _exclude_samples_samples_names_included(self, count_df, sample_name_to_sample_uid_dict, sample_names_included):
+        # Return df containing only the included samples sorted according to that sampple order
+        print('Excluding samples according to user supplied sample_names_included list')
+        # Check that all uids are found in the seq_count_df
+        diff_set = set(sample_names_included).difference(set(sample_name_to_sample_uid_dict.keys()))
+        if not set(sample_names_included).issubset(set(sample_name_to_sample_uid_dict.keys())):
+            raise RuntimeError('The following uids that were specified in the sample_uids_included list are not'
+                               f'found in the SymPortal count table: {diff_set}')
+        else:
+            # All samples were found in the df and those not listed can be exculded
+            count_df = count_df.drop(
+                index=[sample_name_to_sample_uid_dict[sample_name] for sample_name in diff_set],
+                inplace=False
+            )
+            print(f'Excluding {len(diff_set)} samples')
+            return count_df.reindex(
+                [sample_name_to_sample_uid_dict[sample_name] for sample_name in sample_names_included],
+                axis=0
+            )
 
     def _exclude_samples_sample_name_compiled_re_excluded(self, count_df, sample_name_compiled_re_excluded,
                                                           sample_name_to_sample_uid_dict,
@@ -613,7 +692,7 @@ class SPBars:
         diff_set = set(keep).difference(count_df.index.values)
         count_df = count_df.drop(index=diff_set)
         print(f'Excluding {len(diff_set)} samples')
-        return count_df.reindex(keep, axis=1)
+        return count_df.reindex(keep, axis=0)
 
     def _exclude_samples_sample_uids_excluded(self, count_df, sample_uids_excluded):
         print('Excluding samples according to user supplied sample_uids_excluded list')
@@ -627,20 +706,20 @@ class SPBars:
             print(f'Excluding {len(sample_uids_excluded)} samples')
             return count_df.drop(index=sample_uids_excluded, inplace=False)
 
-    def _exclude_samples_sample_uids_included(self, sample_uids_included, seq_count_df):
+    def _exclude_samples_sample_uids_included(self, sample_uids_included, count_df):
         # Return df containing only the included samples sorted according to that sampple order
         print('Excluding samples according to user supplied sample_uids_included list')
         # Check that all uids are found in the seq_count_df
-        if not set(sample_uids_included).issubset(set(seq_count_df.index.values)):
-            diff_set = set(sample_uids_included).difference(set(seq_count_df.index.values))
+        if not set(sample_uids_included).issubset(set(count_df.index.values)):
+            diff_set = set(sample_uids_included).difference(set(count_df.index.values))
             raise RuntimeError('The following uids that were specified in the sample_uids_included list are not'
                                f'found in the SymPortal count table: {diff_set}')
         else:
             # All samples were found in the df and those not listed can be exculded
-            diff_set = set(sample_uids_included).difference(set(seq_count_df.index.values))
-            seq_count_df = seq_count_df.drop(index=diff_set, inplace=False)
+            diff_set = set(sample_uids_included).difference(set(count_df.index.values))
+            count_df = count_df.drop(index=diff_set, inplace=False)
             print(f'Excluding {len(diff_set)} samples')
-            return seq_count_df.reindex(sample_uids_included, axis=1)
+            return count_df.reindex(sample_uids_included, axis=0)
 
     def _find_first_seq_position(self, seq_count_df):
         """
@@ -666,10 +745,3 @@ class SPBars:
             raise RuntimeError(
                 "Please provide either a valid plot_type. Either seq_only, profile_only, or seq_and_profile"
             )
-
-SPBars(
-    seq_count_table_path='/Users/benjaminhume/Documents/projects/20210113_buitrago/sp_output/post_med_seqs/131_20201203_DBV_20201207T095144.seqs.absolute.abund_and_meta.txt',
-    profile_count_table_path='/Users/benjaminhume/Documents/projects/20210113_buitrago/sp_output/its2_type_profiles/131_20201203_DBV_20201207T095144.profiles.absolute.abund_and_meta.txt',
-    plot_type='seq_only', orientation='v', legend=False, relative_abundnce=True,
-    color_by_genus=True, sample_outline=True
-).plot()
