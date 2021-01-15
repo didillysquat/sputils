@@ -161,6 +161,7 @@ class SPBars:
 
     def plot(self):
         self._plot_bars()
+        plt.show()
         foo = 'bar'
 
     def _plot_bars(self):
@@ -203,13 +204,16 @@ class SPBars:
                 non_zero_seq_abundances = non_zero_seq_abundances * -1
             for obj_uid, abund in non_zero_seq_abundances.iteritems():
                 if self.orientation in ['horizontal', 'h']:
-                    coords = (index_for_plot - 0.5, bottom)
+                    self.bar_patches.append(Rectangle(
+                        (index_for_plot - 0.5, bottom),
+                        1,
+                        abund, color=color_dict[obj_uid]))
                 else:
                     coords = (bottom, index_for_plot - 0.5)
-                self.bar_patches.append(Rectangle(
-                    coords,
-                    1,
-                    abund, color=color_dict[obj_uid]))
+                    self.bar_patches.append(Rectangle(
+                        (bottom, index_for_plot - 0.5),
+                        abund,
+                        1, color=color_dict[obj_uid]))
                 bottom += abund
                 color_list.append(color_dict[obj_uid])
             index_for_plot += 1
@@ -546,5 +550,5 @@ class SPBars:
 SPBars(
     seq_count_table_path='/Users/benjaminhume/Documents/projects/20210113_buitrago/sp_output/post_med_seqs/131_20201203_DBV_20201207T095144.seqs.absolute.abund_and_meta.txt',
     profile_count_table_path='/Users/benjaminhume/Documents/projects/20210113_buitrago/sp_output/its2_type_profiles/131_20201203_DBV_20201207T095144.profiles.absolute.abund_and_meta.txt',
-    plot_type='seq_and_profile'
+    plot_type='seq_only', orientation='h'
 ).plot()
