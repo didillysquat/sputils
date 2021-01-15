@@ -35,6 +35,27 @@ class SPBars:
         bar_ax (matplotlib.axes.Axes): if passed, the plot will be done on the provided ax object.
         If None, a fig and ax will be generated and returned. [None]
 
+        seq_leg_ax (matplotlib.axes.Axes): if passed and plot_type is 'seq_only' or 'seq_and_profile',
+        the axis will be used for plotting the sequences legend. Other wise a new axis will be generated. [None]
+
+        profile_leg_ax (matplotlib.axes.Axes): if passed and plot_type is 'profile_only' or 'seq_and_profile',
+        the axis will be used for plotting the profiles legend. Otherwise a new axis will be generated. [None]
+
+        seq_color_dict (dict): if passed this dictionary will be used for plotting sequence abundances.
+        key should be the sequence name, value should be a color that can be used by matplotlib.
+        The dictionary must contain an entry for every sequence to be plotted.
+        By default the standard SymPortal colors will be used. [None]
+
+        profile_color_dict (dict): if passed this dictionary will be used for plotting profile abundances.
+        key should be the profile uid, value should be a color that can be used by matplotlib.
+        The dictionary must contain an entry for every profile to be plotted.
+        By default the standard SymPortal colors will be used. [None]
+
+        genus_color_dict (dict): if passed this dictionary will be used for plotting sequence and profile abundances
+        when coloring according to genus. Keys should be the capital letters A-I that represent the genera that are
+        found in your data. The values should be color-like objects that can be used by matplotlib.
+        By default the standard SymPortal colors will be used. [None]
+
         figsize (tuple): A tuple that will be passed to the plt.figure figure creation. Units should be in mm.
         If not provided this will automatically deduced. [None]
 
@@ -93,7 +114,8 @@ class SPBars:
             orientation='h', legend=True,
             relative_abundnce=True, num_seq_leg_cols=20, num_profile_leg_cols=20, seqs_right_bottom=False,
             reverse_seq_abund=False, reverse_profile_abund=False, color_by_genus=False, sample_outline=False,
-            save_fig=False, fig_output_dir=None, bar_ax=None
+            save_fig=False, fig_output_dir=None, bar_ax=None, seq_leg_ax=None, profile_leg_ax=None,
+            seq_color_dict=None, profile_color_dict=None, genus_color_dict=None
     ):
 
         # arguments that will be used throughout the class
@@ -115,23 +137,16 @@ class SPBars:
         self.fig_output_dir = fig_output_dir
         self.date_time = str(datetime.now()).split('.')[0].replace('-', '').replace(' ', 'T').replace(':', '')
         self.bar_ax = bar_ax
+        self.seq_leg_ax = seq_leg_ax
+        self.profile_leg_ax = profile_leg_ax
+        self.seq_color_dict = seq_color_dict
+        self.profile_color_dict = profile_color_dict
+        self.genus_color_dict = genus_color_dict
 
         # Check the inputs
-        self._check_path_exists([seq_count_table_path, profile_count_table_path])
-        if self.plot_type not in ['seq_only', 'profile_only', 'seq_and_profile']:
-            raise RuntimeError("plot_type must be one of 'seq_only', 'profile_only', or 'seq_and_profile'")
-        if self.orientation not in ['h', 'v', 'horizontal', 'vertical']:
-            raise RuntimeError("orientation must be one of 'h', 'v', 'horizontal', or 'vertical' ")
-        if not type(self.legend) == bool:
-            raise RuntimeError("legend should be a bool")
-        # Check that only one of the exclude arguments has been provided
-        self._check_exclude_arguments(
-            sample_name_compiled_re_excluded, sample_name_compiled_re_included,
-            sample_names_excluded, sample_names_included,
-            sample_uids_excluded, sample_uids_included
-        )
-
-        self._check_valid_params(profile_count_table_path, seq_count_table_path)
+        self._check_user_inputs(profile_count_table_path, sample_name_compiled_re_excluded,
+                                sample_name_compiled_re_included, sample_names_excluded, sample_names_included,
+                                sample_uids_excluded, sample_uids_included, seq_count_table_path)
 
         if seq_count_table_path:
             (
@@ -161,19 +176,62 @@ class SPBars:
         # List for holding the rectangle patches used in making the bars
         self.bar_patches = []
 
+        self._setup_colors()
+
+    def _check_user_inputs(self, profile_count_table_path, sample_name_compiled_re_excluded,
+                           sample_name_compiled_re_included, sample_names_excluded, sample_names_included,
+                           sample_uids_excluded, sample_uids_included, seq_count_table_path):
+        self._check_path_exists([seq_count_table_path, profile_count_table_path])
+        if self.plot_type not in ['seq_only', 'profile_only', 'seq_and_profile']:
+            raise RuntimeError("plot_type must be one of 'seq_only', 'profile_only', or 'seq_and_profile'")
+        if self.orientation not in ['h', 'v', 'horizontal', 'vertical']:
+            raise RuntimeError("orientation must be one of 'h', 'v', 'horizontal', or 'vertical' ")
+        if not type(self.legend) == bool:
+            raise RuntimeError("legend should be a bool")
+        # Check that only one of the exclude arguments has been provided
+        self._check_exclude_arguments(
+            sample_name_compiled_re_excluded, sample_name_compiled_re_included,
+            sample_names_excluded, sample_names_included,
+            sample_uids_excluded, sample_uids_included
+        )
+        self._check_valid_params(profile_count_table_path, seq_count_table_path)
+
+    def _setup_colors(self):
         # Plotting colors setup
         self.grey_iterator = itertools.cycle(spcolors.greys)
-        self.genus_color_dict = spcolors.genus_color_dict
+        if self.color_by_genus:
+            self._set_genus_color_dict()
+        if self.plot_type in ['seq_only', 'seq_and_profile']:
+            self._setup_seq_colors()
+        if self.plot_type in ['profile_only', 'seq_and_profile']:
+            self._setup_profile_colors()
 
-        if plot_type in ['seq_only', 'seq_and_profile']:
-            # TODO we will only need one legend if we are coloring by genus
-            if not self.color_by_genus:
-                self.color_hash_iterator = iter(spcolors.color_list)
-                self.pre_def_seq_color_dict = spcolors.pre_def_color_dict
-            self.seq_color_dict = self._make_seq_color_dict()
+    def _set_genus_color_dict(self):
+        if self.genus_color_dict is None:
+            self.genus_color_dict = spcolors.genus_color_dict
+        else:
+            if self.plot_type in ['seq_only', 'seq_and_profile']:
+                self._validate_user_genus_color_dict(df=self.seq_count_df)
+            else:
+                self._validate_user_genus_color_dict(df=self.profile_count_df)
 
-        if plot_type in ['profile_only', 'seq_and_profile']:
-            if not self.color_by_genus:
+    def _validate_user_genus_color_dict(self, df):
+        """
+        Validate the user provided genus_color_dict
+        Make sure all clades in the count df are provided as keys and that the values can be used as colors
+        """
+        if not set(list(df)).issubset(set(self.genus_color_dict.keys())):
+            raise RuntimeError('You have provided a genus_color_dict, '
+                               'but it does not contain the required keys.'
+                               'It needs to contain the following keys:\n'
+                               f'{list(df)}')
+        for v in self.genus_color_dict.values():
+            if not mpl.colors.is_color_like(v):
+                raise RuntimeError('You have provided colors that cannot be used as matplotlib colors.\n')
+
+    def _setup_profile_colors(self):
+        if not self.color_by_genus:
+            if self.profile_color_dict is None:
                 self.profile_col_generator = (
                     '#%02x%02x%02x' % rgb_tup for rgb_tup in
                     spcolors.create_color_list(
@@ -183,7 +241,37 @@ class SPBars:
                         time_out_iterations=10000,
                         warnings_off=True)
                 )
+                self.profile_color_dict = self._make_profile_color_dict()
+            else:
+                # User has provided a profile_color_dict
+                # Verify that the dict contains entries for all profiles in the count table
+                for profile_uid in list(self.profile_count_df):
+                    if profile_uid not in self.profile_color_dict:
+                        raise RuntimeError('One or more of the profile uids in your '
+                                           'dataset was not found in your provided seq_color_dict.')
+                return  # self.seq_color_dict is already set
+        else:
             self.profile_color_dict = self._make_profile_color_dict()
+
+    def _setup_seq_colors(self):
+        # TODO we will only need one legend if we are coloring by genus
+        if not self.color_by_genus:
+            if self.seq_color_dict is None:
+                self.color_hash_iterator = iter(spcolors.color_list)
+                self.pre_def_seq_color_dict = spcolors.pre_def_color_dict
+                self.seq_color_dict = self._make_seq_color_dict()
+            else:
+                # User has provided a seq_color_dict
+                # Verify that the dict contains entries for all sequences in the count table
+                for seq_name in list(self.seq_count_df):
+                    if seq_name not in self.seq_color_dict:
+                        raise RuntimeError('One or more of the sequence names in your '
+                                           'dataset was not found in your provided seq_color_dict.'
+                                           )
+                return # self.seq_color_dict is already set
+        else:
+            self.seq_color_dict = self._make_seq_color_dict()
+
 
     def _check_exclude_arguments(self, sample_name_compiled_re_excluded, sample_name_compiled_re_included,
                                  sample_names_excluded, sample_names_included, sample_uids_excluded,
@@ -207,7 +295,7 @@ class SPBars:
 
     def _make_profile_color_dict(self):
         if self.color_by_genus:
-            return spcolors.genus_color_dict
+            return self.genus_color_dict
         else:
             prof_color_dict = {}
             for prof_uid in list(self.profile_count_df):
@@ -271,7 +359,7 @@ class SPBars:
         patches_collection.set_array(np.arange(len(self.bar_patches)))
         self.bar_ax.add_collection(patches_collection)
         self.bar_ax.autoscale_view()
-        self.fig.canvas.draw()
+        self.bar_ax.figure.canvas.draw()
 
     def _set_ax_lims_and_outline_only_plot(self, df):
         if self.orientation == 'v':
@@ -329,7 +417,7 @@ class SPBars:
 
     def _make_seq_color_dict(self):
         if self.color_by_genus:
-            return spcolors.genus_color_dict
+            return self.genus_color_dict
         else:
             seq_color_dict = {}
             for seq_name in list(self.seq_count_df):
@@ -354,6 +442,8 @@ class SPBars:
         if self.bar_ax is not None:
             # Then the user has provided us with an axis that we should plot to.
             # The bar_ax will already have a fig associated to it so we don't need to generate a fig object.
+            if self.legend:
+                self._check_for_user_legend_axes()
             return
         if self.plot_type == 'seq_and_profile':
             # Then we need to have two legend axes if legend plotted
@@ -361,6 +451,28 @@ class SPBars:
         else:
             # Then we are working with a single legend if legend plotted
             self._setup_seq_or_profile_only_plot(figsize)
+
+    def _check_for_user_legend_axes(self):
+        # Then the user wants a legend plotted
+        # Given that the user has passed us a bar ax, they should also have passed us the required axes
+        # for plotting the legends
+        if self.plot_type == 'seq_only':
+            if self.seq_leg_ax is None:
+                raise RuntimeError('You have passed a bar_ax but you have not passed an axis for plotting '
+                                   'the sequence legend on.\n'
+                                   'Either set legend to False, or provide an axis using seq_leg_ax.\n')
+        elif self.plot_type == 'profile_only':
+            if self.profile_leg_ax is None:
+                raise RuntimeError('You have passed a bar_ax but you have not passed an axis for plotting '
+                                   'the profile legend on.\n'
+                                   'Either set legend to False, or provide an axis using profile_leg_ax.\n')
+        else:
+            # plot_type == seq_and_profile
+            if self.profile_leg_ax is None or self.seq_leg_ax is None:
+                raise RuntimeError('You have passed a bar_ax but you have not passed an axis object '
+                                   'for plotting both of the legends.\n'
+                                   'Either set legend to False, or provide axes '
+                                   'using seq_leg_ax and profile_leg_ax.\n')
 
     def _setup_seq_or_profile_only_plot(self, figsize):
         if self.orientation == 'v':
