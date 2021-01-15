@@ -172,18 +172,10 @@ class SPBars:
             self.profile_color_dict = self._make_profile_color_dict()
 
     def _make_profile_color_dict(self):
-        prof_color_dict = {}
         if self.color_by_genus:
-            for clade in list('ABCDEFGI'):
-                clade_col = self.genus_color_dict[clade]
-                prof_color_dict.update(
-                    {
-                        prof_uid: clade_col for prof_uid in list(self.profile_count_df) if
-                        self.profile_uid_to_profile_name_dict[prof_uid].startswith(clade)
-                    }
-                )
-            return prof_color_dict
+            return spcolors.genus_color_dict
         else:
+            prof_color_dict = {}
             for prof_uid in list(self.profile_count_df):
                 try:
                     prof_color_dict[prof_uid] = next(self.profile_col_generator)
@@ -259,18 +251,10 @@ class SPBars:
             index_for_plot += 1
 
     def _make_seq_color_dict(self):
-        seq_color_dict = {}
         if self.color_by_genus:
-            for clade in list('ABCDEFGI'):
-                clade_col = self.genus_color_dict[clade]
-                seq_color_dict.update(
-                    {
-                        seq_name: clade_col for seq_name in list(self.seq_count_df) if
-                        (seq_name.startswith(clade) or seq_name.endswith(clade))
-                    }
-                )
-            return seq_color_dict
+            return spcolors.genus_color_dict
         else:
+            seq_color_dict = {}
             for seq_name in list(self.seq_count_df):
                 if seq_name in self.pre_def_seq_color_dict:
                     seq_color_dict[seq_name] = self.pre_def_seq_color_dict[seq_name]
@@ -440,6 +424,19 @@ class SPBars:
             sample_name_compiled_re_included, sample_name_compiled_re_excluded
         )
 
+        # If color_by_genus convert to genera abunances
+        if self.color_by_genus:
+            present_genera = set([prof_name[0] for prof_name in profile_name_to_profile_uid_dict.keys()])
+            for i, clade in enumerate(present_genera):
+                profile_count_df_abund[clade] = profile_count_df_abund[
+                    [
+                        profile_uid for profile_uid in list(profile_count_df_abund)[:(-1 * i)] if
+                        profile_uid_to_profile_name_dict[profile_uid].startswith(clade)
+                    ]
+                ].sum(axis=1)
+            # drop non-clade cols
+            profile_count_df_abund = profile_count_df_abund.drop(list(profile_count_df_abund)[:(-1 * len(present_genera))], axis=1)
+
         # Convert to relative abundances
         if relative_abundance:
             profile_count_df_abund = profile_count_df_abund.div(
@@ -488,6 +485,19 @@ class SPBars:
             sample_uids_included, sample_uids_excluded,
             sample_name_compiled_re_included, sample_name_compiled_re_excluded
         )
+
+        # If color_by_genus convert to genera abunances
+        if self.color_by_genus:
+            present_genera = set([_[0] if _[0] in list('ABCDEFGHI') else _[-1] for _ in list(seq_count_df)])
+            for clade in present_genera:
+                seq_count_df[clade] = seq_count_df[
+                    [
+                        seq_name for seq_name in list(seq_count_df) if
+                        (seq_name.startswith(clade) or seq_name.endswith(clade))
+                    ]
+                ].sum(axis=1)
+            # drop non-clade cols
+            seq_count_df = seq_count_df.drop(list(seq_count_df)[:(-1 * len(present_genera))], axis=1)
 
         # Convert to relative abundances
         if relative_abundance:
