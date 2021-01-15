@@ -41,6 +41,9 @@ class SPBars:
         profile_leg_ax (matplotlib.axes.Axes): if passed and plot_type is 'profile_only' or 'seq_and_profile',
         the axis will be used for plotting the profiles legend. Otherwise a new axis will be generated. [None]
 
+        genus_leg_ax (matplotlib.axes.Axes): if passed and color_by_genus is True,
+        the axis will be used for plotting the legend. Otherwise a new axis will be generated. [None]
+
         seq_color_dict (dict): if passed this dictionary will be used for plotting sequence abundances.
         key should be the sequence name, value should be a color that can be used by matplotlib.
         The dictionary must contain an entry for every sequence to be plotted.
@@ -114,7 +117,7 @@ class SPBars:
             orientation='h', legend=True,
             relative_abundnce=True, num_seq_leg_cols=20, num_profile_leg_cols=20, seqs_right_bottom=False,
             reverse_seq_abund=False, reverse_profile_abund=False, color_by_genus=False, sample_outline=False,
-            save_fig=False, fig_output_dir=None, bar_ax=None, seq_leg_ax=None, profile_leg_ax=None,
+            save_fig=False, fig_output_dir=None, bar_ax=None, seq_leg_ax=None, profile_leg_ax=None, genus_leg_ax=None,
             seq_color_dict=None, profile_color_dict=None, genus_color_dict=None
     ):
 
@@ -139,6 +142,7 @@ class SPBars:
         self.bar_ax = bar_ax
         self.seq_leg_ax = seq_leg_ax
         self.profile_leg_ax = profile_leg_ax
+        self.genus_leg_ax = genus_leg_ax
         self.seq_color_dict = seq_color_dict
         self.profile_color_dict = profile_color_dict
         self.genus_color_dict = genus_color_dict
@@ -456,23 +460,29 @@ class SPBars:
         # Then the user wants a legend plotted
         # Given that the user has passed us a bar ax, they should also have passed us the required axes
         # for plotting the legends
-        if self.plot_type == 'seq_only':
-            if self.seq_leg_ax is None:
+        if self.color_by_genus:
+            if self.genus_leg_ax is None:
                 raise RuntimeError('You have passed a bar_ax but you have not passed an axis for plotting '
-                                   'the sequence legend on.\n'
-                                   'Either set legend to False, or provide an axis using seq_leg_ax.\n')
-        elif self.plot_type == 'profile_only':
-            if self.profile_leg_ax is None:
-                raise RuntimeError('You have passed a bar_ax but you have not passed an axis for plotting '
-                                   'the profile legend on.\n'
-                                   'Either set legend to False, or provide an axis using profile_leg_ax.\n')
+                                   'the genus color legend on.\n'
+                                   'Either set legend to False, or provide an axis using genus_leg_ax.\n')
         else:
-            # plot_type == seq_and_profile
-            if self.profile_leg_ax is None or self.seq_leg_ax is None:
-                raise RuntimeError('You have passed a bar_ax but you have not passed an axis object '
-                                   'for plotting both of the legends.\n'
-                                   'Either set legend to False, or provide axes '
-                                   'using seq_leg_ax and profile_leg_ax.\n')
+            if self.plot_type == 'seq_only':
+                if self.seq_leg_ax is None:
+                    raise RuntimeError('You have passed a bar_ax but you have not passed an axis for plotting '
+                                       'the sequence legend on.\n'
+                                       'Either set legend to False, or provide an axis using seq_leg_ax.\n')
+            elif self.plot_type == 'profile_only':
+                if self.profile_leg_ax is None:
+                    raise RuntimeError('You have passed a bar_ax but you have not passed an axis for plotting '
+                                       'the profile legend on.\n'
+                                       'Either set legend to False, or provide an axis using profile_leg_ax.\n')
+            else:
+                # plot_type == seq_and_profile
+                if self.profile_leg_ax is None or self.seq_leg_ax is None:
+                    raise RuntimeError('You have passed a bar_ax but you have not passed an axis object '
+                                       'for plotting both of the legends.\n'
+                                       'Either set legend to False, or provide axes '
+                                       'using seq_leg_ax and profile_leg_ax.\n')
 
     def _setup_seq_or_profile_only_plot(self, figsize):
         if self.orientation == 'v':
