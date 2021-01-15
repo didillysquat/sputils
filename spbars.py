@@ -72,6 +72,8 @@ class SPBars:
 
         color_by_genus (bool): If True, sequences and profiles will be colored according to their genus. [False]
 
+        sample_outline (bool): If True, each sample will be separated by a black line. [False]
+
     Returns:
         tuple(matplotlib.pyplot.figure, matplotlib.axes.Axes): The figure and axes object that contain the plot
 
@@ -82,12 +84,15 @@ class SPBars:
             sample_name_compiled_re_included=None, sample_name_compiled_re_excluded=None,
             orientation='h', legend=True,
             relative_abundnce=True, num_seq_leg_cols=20, num_profile_leg_cols=20, seqs_right_bottom=False,
-            reverse_seq_abund=False, reverse_profile_abund=False, color_by_genus=False
+            reverse_seq_abund=False, reverse_profile_abund=False, color_by_genus=False, sample_outline=False
     ):
 
         # arguments that will be used throughout the class
         self.plot_type = plot_type
-        self.orientation = orientation
+        if orientation in ['v', 'vertical']:
+            self.orientation = 'v'
+        elif orientation in ['h', 'horizontal']:
+            self.orientation = 'h'
         self.legend = legend
         self.seqs_right_bottom = seqs_right_bottom
         self.reverse_seq_abund = reverse_seq_abund
@@ -95,6 +100,8 @@ class SPBars:
         self.color_by_genus = color_by_genus
         self.num_profile_leg_cols = num_profile_leg_cols
         self.num_seq_leg_cols = num_seq_leg_cols
+        self.relative_abundance = relative_abundnce
+        self.sample_outline = sample_outline
 
         # Check the inputs
         self._check_path_exists([seq_count_table_path, profile_count_table_path])
@@ -125,7 +132,7 @@ class SPBars:
                 self.sample_uid_to_sample_name_dict,
                 self.seq_count_df
             ) = self._make_seq_count_df(
-                seq_count_table_path, relative_abundnce,
+                seq_count_table_path,
                 sample_uids_included, sample_uids_excluded,
                 sample_name_compiled_re_included, sample_name_compiled_re_excluded
             )
@@ -135,7 +142,7 @@ class SPBars:
                 self.profile_name_to_profile_uid_dict, self.profile_uid_to_profile_name_dict,
                 self.profile_count_df
             ) = self._make_profile_count_df(
-                    profile_count_table_path, relative_abundnce,
+                    profile_count_table_path,
                     sample_uids_included, sample_uids_excluded,
                     sample_name_compiled_re_included, sample_name_compiled_re_excluded
             )
@@ -186,6 +193,8 @@ class SPBars:
     def plot(self):
         self._plot_bars()
         plt.show()
+        plt.savefig('figure_1.svg')
+        plt.savefig('figure_1.png', dpi=1200)
         foo = 'bar'
 
     def _plot_bars(self):
@@ -202,10 +211,12 @@ class SPBars:
         color_list = []
         if self.plot_type == 'seq_only':
             self._make_rect_and_cols(color_dict=self.seq_color_dict, color_list=color_list, df=self.seq_count_df)
+            self._set_ax_lims_and_outline_only_plot(df=self.seq_count_df)
         elif self.plot_type == 'profile_only':
             self._make_rect_and_cols(
                 color_dict=self.profile_color_dict, color_list=color_list, df=self.profile_count_df
             )
+            self._set_ax_lims_and_outline_only_plot(df=self.profile_count_df)
         else:
             if self.seqs_right_bottom:
                 self._make_rect_and_cols(color_dict=self.seq_color_dict, color_list=color_list, df=self.seq_count_df,
@@ -214,17 +225,50 @@ class SPBars:
                     color_dict=self.profile_color_dict, color_list=color_list, df=self.profile_count_df,
                     pos_neg='negative'
                 )
+                self._set_ax_lims_both_plot()
             else:
                 self._make_rect_and_cols(color_dict=self.seq_color_dict, color_list=color_list, df=self.seq_count_df, pos_neg='negative')
                 self._make_rect_and_cols(
                     color_dict=self.profile_color_dict, color_list=color_list, df=self.profile_count_df, pos_neg='positive'
                 )
+                self._set_ax_lims_both_plot()
+
         listed_color_map = ListedColormap(color_list)
         patches_collection = PatchCollection(self.bar_patches, cmap=listed_color_map)
         patches_collection.set_array(np.arange(len(self.bar_patches)))
         self.bar_ax.add_collection(patches_collection)
         self.bar_ax.autoscale_view()
         self.fig.canvas.draw()
+
+    def _set_ax_lims_and_outline_only_plot(self, df):
+        if self.orientation == 'v':
+            self.bar_ax.set_ylim(-0.5, len(df) - 0.5)
+            self.bar_ax.set_xlim(0, df.to_numpy().max())
+            if self.sample_outline:
+                for y in np.arange(0.5, len(df.index) - 1.5):
+                    # TODO dynamically program the lw
+                    self.bar_ax.axhline(y=y, lw=0.1, c='black')
+        else:
+            self.bar_ax.set_ylim(0, df.to_numpy().max())
+            self.bar_ax.set_xlim(-0.5, len(df) - 0.5)
+            if self.sample_outline:
+                for x in np.arange(0.5, len(df.index) - 1.5):
+                    #TODO dynamically program the lw
+                    self.bar_ax.axvline(x=x, lw=0.1, c='black')
+
+    def _set_ax_lims_both_plot(self):
+        if self.orientation == 'v':
+            self.bar_ax.set_ylim(-0.5, len(self.seq_count_df.index) - 0.5)
+            if self.seqs_right_bottom:
+                self.bar_ax.set_xlim(-1 * self.profile_count_df.to_numpy().max(), self.seq_count_df.to_numpy().max())
+            else:
+                self.bar_ax.set_xlim(-1 * self.profile_count_df.to_numpy().max(), self.seq_count_df.to_numpy().max())
+        else:
+            self.bar_ax.set_xlim(-0.5, len(self.seq_count_df.index) - 0.5)
+            if self.seqs_right_bottom:
+                self.bar_ax.set_ylim(-1 * self.profile_count_df.to_numpy().max(), self.seq_count_df.to_numpy().max())
+            else:
+                self.bar_ax.set_ylim(-1 * self.profile_count_df.to_numpy().max(), self.seq_count_df.to_numpy().max())
 
     def _make_rect_and_cols(self, color_dict, color_list, df, pos_neg='positive'):
         index_for_plot = 0
@@ -282,7 +326,7 @@ class SPBars:
             self._setup_seq_or_profile_only_plot(figsize)
 
     def _setup_seq_or_profile_only_plot(self, figsize):
-        if self.orientation in ['v', 'vertical']:
+        if self.orientation == 'v':
             # Then we want the bar plot to sit next to the legend plots
             # The bars will span the full height of the figure
             if figsize:
@@ -324,7 +368,7 @@ class SPBars:
                 self.bar_ax = plt.subplot(gs[:, :])
 
     def _setup_seq_and_profile(self, figsize):
-        if self.orientation in ['v', 'vertical']:
+        if self.orientation == 'v':
             # Then we want the bar plot to sit next to the legend plots
             # The bars will span the full height of the figure
             # The seq legend will span the top half
@@ -386,7 +430,7 @@ class SPBars:
             return tuple(i / inch for i in tupl)
 
     def _make_profile_count_df(
-            self, profile_count_table_path, relative_abundance,
+            self, profile_count_table_path,
                 sample_uids_included, sample_uids_excluded,
                 sample_name_compiled_re_included, sample_name_compiled_re_excluded
     ):
@@ -438,7 +482,7 @@ class SPBars:
             profile_count_df_abund = profile_count_df_abund.drop(list(profile_count_df_abund)[:(-1 * len(present_genera))], axis=1)
 
         # Convert to relative abundances
-        if relative_abundance:
+        if self.relative_abundance:
             profile_count_df_abund = profile_count_df_abund.div(
                 profile_count_df_abund.sum(axis=1), axis=0
             )
@@ -457,7 +501,7 @@ class SPBars:
         )
 
     def _make_seq_count_df(
-            self, seq_count_table_path, relative_abundance,
+            self, seq_count_table_path,
                 sample_uids_included, sample_uids_excluded,
                 sample_name_compiled_re_included, sample_name_compiled_re_excluded
     ):
@@ -500,7 +544,7 @@ class SPBars:
             seq_count_df = seq_count_df.drop(list(seq_count_df)[:(-1 * len(present_genera))], axis=1)
 
         # Convert to relative abundances
-        if relative_abundance:
+        if self.relative_abundance:
             seq_count_df = seq_count_df.div(
                 seq_count_df.sum(axis=1), axis=0
             )
@@ -626,5 +670,6 @@ class SPBars:
 SPBars(
     seq_count_table_path='/Users/benjaminhume/Documents/projects/20210113_buitrago/sp_output/post_med_seqs/131_20201203_DBV_20201207T095144.seqs.absolute.abund_and_meta.txt',
     profile_count_table_path='/Users/benjaminhume/Documents/projects/20210113_buitrago/sp_output/its2_type_profiles/131_20201203_DBV_20201207T095144.profiles.absolute.abund_and_meta.txt',
-    plot_type='seq_only', orientation='v', legend=False, relative_abundnce=True, color_by_genus=True
+    plot_type='seq_only', orientation='v', legend=False, relative_abundnce=True,
+    color_by_genus=True, sample_outline=True
 ).plot()
