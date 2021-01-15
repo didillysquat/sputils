@@ -311,7 +311,6 @@ class SPBars:
 
     def plot(self):
         self._plot_bars()
-        plt.show()
         if self.save_fig:
             if self.fig_output_dir:
                 if not os.path.exists(self.fig_output_dir):
@@ -645,6 +644,8 @@ class SPBars:
             profile_count_df_abund = profile_count_df_abund.div(
                 profile_count_df_abund.sum(axis=1), axis=0
             )
+            # Then mask nan with 0
+            profile_count_df_abund.fillna(0, inplace=True)
 
         # sort by column abundances, highest first
         if self.reverse_profile_abund:
