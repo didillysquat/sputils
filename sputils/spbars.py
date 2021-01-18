@@ -10,10 +10,12 @@ from matplotlib.colors import ListedColormap
 import re
 import matplotlib.gridspec as gridspec
 from sputils import spcolors
+from sputils import sputils
 import itertools
 from datetime import datetime
 
-class SPBars:
+
+class SPBars(sputils.SPUtils):
     """
     A utility script for creating stacked bar plots from SymPortal output documents.
     It will produce sequence only, ITS2 type profile only, or a combination type plot.
@@ -63,12 +65,12 @@ class SPBars:
         If not provided this will automatically deduced. [None]
 
         sample_uids_included (list<int>): A list of the sample uids that should be plotted.
-        The samples will be plotted in this order.[None]
+        For bar plots, the samples will be plotted in this order.[None]
 
         sample_uids_excluded (list<int>): A list of the sample uids that should be excluded from plotting. [None]
 
         sample_names_included (list<str>): A list of the sample names that should be plotted.
-        The samples will be plotted in this order.[None]
+        For bar plots, the samples will be plotted in this order.[None]
 
         sample_names_excluded (list<str>): A list of the sample names that should be excluded from plotting. [None]
 
@@ -275,27 +277,6 @@ class SPBars:
                 return # self.seq_color_dict is already set
         else:
             self.seq_color_dict = self._make_seq_color_dict()
-
-
-    def _check_exclude_arguments(self, sample_name_compiled_re_excluded, sample_name_compiled_re_included,
-                                 sample_names_excluded, sample_names_included, sample_uids_excluded,
-                                 sample_uids_included):
-        c_count = 0
-        for constraint in [
-            sample_uids_included, sample_uids_excluded,
-            sample_names_included, sample_names_excluded,
-            sample_name_compiled_re_included, sample_name_compiled_re_excluded
-        ]:
-            if constraint is not None:
-                c_count += 1
-                if c_count > 1:
-                    raise RuntimeError('Please provide only one of:\n'
-                                       '\tsample_uids_included\n'
-                                       '\tsample_uids_excluded\n'
-                                       '\tsample_names_included\n'
-                                       '\tsample_names_excluded\n'
-                                       '\tsample_name_compiled_re_included\n'
-                                       '\tsample_name_compiled_re_excluded\n')
 
     def _make_profile_color_dict(self):
         if self.color_by_genus:

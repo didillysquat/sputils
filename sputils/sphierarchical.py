@@ -39,18 +39,38 @@ class SPHierarchical:
     save_fig (bool): If passed the figure will be output. This will only have an effect if ax is None. [False]
 
     output_dir (str): Directory to save the figure to. This will only have an effect if save_fig is True. [cwd]
+
+    sample_uids_included (list<int>): A list of the sample uids that should be plotted.
+    For bar plots, the samples will be plotted in this order.[None]
+
+    sample_uids_excluded (list<int>): A list of the sample uids that should be excluded from plotting. [None]
+
+    sample_names_included (list<str>): A list of the sample names that should be plotted.
+    For bar plots, the samples will be plotted in this order.[None]
+
+    sample_names_excluded (list<str>): A list of the sample names that should be excluded from plotting. [None]
+
+    sample_name_compiled_re_included (compiled regex): A regular expression, which if matched by a sample name,
+    will denote that the sample should be included in plotting. [None]
+
+    sample_name_compiled_re_included (compiled regex): A regular expression, which if matched by a sample name,
+    will denote that the sample should be included in plotting. [None]
     """
 
 
     def __init__(
-            self, dist_output_path, sample_profile=None, labels=False,
-            color_dict=None, thickness_dict=None, orientation='h', ax=None, save_fig=False, output_dir=None):
+            self, dist_output_path=None, sample_profile=None, labels=False,
+            color_dict=None, thickness_dict=None, orientation='h', ax=None, save_fig=False, output_dir=None,
+            sample_uids_included=None, sample_uids_excluded=None, sample_names_included=None,
+            sample_names_excluded=None, sample_name_compiled_re_included=None, sample_name_compiled_re_excluded=None
+    ):
         self.labels = labels
         self.color_dict = color_dict
         self.thickness_dict = thickness_dict
         self.date_time = str(datetime.now()).split('.')[0].replace('-', '').replace(' ', 'T').replace(':', '')
         self.save_fig = save_fig
         self.output_dir = output_dir
+        self.sample_names_to_include = samples_names_to_include
         if orientation in ['h', 'horizontal']:
             self.orientation = 'h'
         elif orientation in ['v', 'vertical']:
@@ -74,7 +94,12 @@ class SPHierarchical:
             f_list = [_.split('\t') for _ in f]
         self.obj_name_to_obj_uid_dict = {_[0]: _[1] for _ in f_list}
         self.obj_uid_to_obj_name_dict = {v: k for k, v in self.obj_name_to_obj_uid_dict.items()}
-        self.dist_df = pd.DataFrame(data=[_[2:] for _ in f_list], columns=list(self.obj_uid_to_obj_name_dict.keys()), index=list(self.obj_uid_to_obj_name_dict.keys())).astype(float)
+        self.dist_df = pd.DataFrame(
+            data=[_[2:] for _ in f_list],
+            columns=list(self.obj_uid_to_obj_name_dict.keys()),
+            index=list(self.obj_uid_to_obj_name_dict.keys())
+        ).astype(float)
+        # TODO refactor the code form SPBars for checking the userinput sample include and exclude lists
 
         # Figure setup
         self.fig, self.ax = self._setup_axis(ax)
@@ -87,7 +112,8 @@ class SPHierarchical:
         linkage = scipy.cluster.hierarchy.linkage(y=condensed_dist, optimal_ordering=True)
         self.dendrogram = scipy.cluster.hierarchy.dendrogram(
             linkage, labels=(list(self.dist_df)), ax=self.ax, leaf_rotation=90, no_labels=not
-            self.labels, link_color_func=lambda k: '#000000', orientation='top'
+            self.labels, link_color_func=lambda k: '#000000', orientation='top', get_leaves=True,
+            show_leaf_counts=True
         )
         if self.save_fig:
             if self.output_dir is None:
