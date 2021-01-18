@@ -409,7 +409,6 @@ class SPBars:
                         1,
                         abund, color=color_dict[obj_uid]))
                 else:
-                    coords = (bottom, index_for_plot - 0.5)
                     self.bar_patches.append(Rectangle(
                         (bottom, index_for_plot - 0.5),
                         abund,
