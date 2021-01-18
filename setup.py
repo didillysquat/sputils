@@ -25,7 +25,7 @@ setuptools.setup(
     ],
     license='GPL-3.0-only',
     python_requires='>=3.6',
-    install_requires=['pandas', 'matplotlib', 'numpy'],
+    install_requires=['pandas', 'matplotlib', 'numpy', 'scipy'],
     scripts=['scripts/spbars.py'],
     project_urls={
         'Bug Reports': 'https://github.com/didillysquat/sputils/issues',
