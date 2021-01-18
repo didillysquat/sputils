@@ -97,10 +97,10 @@ class SPUtils:
                 df=count_df, labels=[sample_name_to_sample_uid_dict[sample_name] for sample_name in diff_set],
                 dist=dist)
             print(f'Excluding {len(diff_set)} samples')
-            return count_df.reindex(
-                [sample_name_to_sample_uid_dict[sample_name] for sample_name in sample_names_included],
-                axis=0
-            )
+            return self._reindex_df(
+                df=count_df,
+                labels=[sample_name_to_sample_uid_dict[sample_name] for sample_name in sample_names_included],
+                dist=dist)
 
     def _exclude_samples_sample_name_compiled_re_excluded(self, count_df, sample_name_compiled_re_excluded,
                                                           sample_name_to_sample_uid_dict,
@@ -129,7 +129,7 @@ class SPUtils:
         diff_set = set(keep).symmetric_difference(count_df.index.values)
         count_df = self._drop_from_df(df=count_df, labels=diff_set, dist=dist)
         print(f'Excluding {len(diff_set)} samples')
-        return count_df.reindex(keep, axis=0)
+        return self._reindex_df(df=count_df, labels=keep, dist=dist)
 
     def _exclude_samples_sample_uids_excluded(self, count_df, sample_uids_excluded, dist):
         print('Excluding samples according to user supplied sample_uids_excluded list')
@@ -156,7 +156,7 @@ class SPUtils:
             diff_set = set(sample_uids_included).symmetric_difference(set(count_df.index.values))
             count_df = self._drop_from_df(df=count_df, labels=diff_set, dist=dist)
             print(f'Excluding {len(diff_set)} samples')
-            return count_df.reindex(sample_uids_included, axis=0)
+            return self._reindex_df(df=count_df, labels=sample_uids_included, dist=dist)
 
     @staticmethod
     def _drop_from_df(df, labels, dist):
@@ -164,3 +164,10 @@ class SPUtils:
             return df.drop(index=labels, columns=labels)
         else:
             return df.drop(index=labels)
+
+    @staticmethod
+    def _reindex_df(df, labels, dist):
+        if dist:
+            return df
+        else:
+            return df.reindex(labels, axis=0)
