@@ -37,6 +37,9 @@ class SPHierarchical(sputils.SPUtils):
     ax (matplotlib.axes.Axes) = If passed, the dedrogram will be plotted to this axis.
     Else a figure and axis will be created. [None]
 
+    no_plotting (bool): If True, then no figure or ax object will be created. This is useful when you want to
+    run the __init__ of the class to get access to its objects without producing figures. [False]
+
     save_fig (bool): If passed the figure will be output. This will only have an effect if ax is None. [False]
 
     output_dir (str): Directory to save the figure to. This will only have an effect if save_fig is True. [cwd]
@@ -64,7 +67,7 @@ class SPHierarchical(sputils.SPUtils):
             color_dict=None, thickness_dict=None, orientation='h', ax=None, save_fig=False, output_dir=None,
             sample_uids_included=None, sample_uids_excluded=None,
             sample_names_included=None, sample_names_excluded=None,
-            sample_name_compiled_re_included=None, sample_name_compiled_re_excluded=None,
+            sample_name_compiled_re_included=None, sample_name_compiled_re_excluded=None, no_plotting=False
     ):
 
         self._check_exclude_arguments(
@@ -79,6 +82,7 @@ class SPHierarchical(sputils.SPUtils):
         self.date_time = str(datetime.now()).split('.')[0].replace('-', '').replace(' ', 'T').replace(':', '')
         self.save_fig = save_fig
         self.output_dir = output_dir
+        self.no_plotting = no_plotting
 
         if orientation in ['h', 'horizontal']:
             self.orientation = 'h'
@@ -108,19 +112,26 @@ class SPHierarchical(sputils.SPUtils):
             columns=list(self.obj_uid_to_obj_name_dict.keys()),
             index=list(self.obj_uid_to_obj_name_dict.keys())
         ).astype(float)
+
         self.dist_df = self._exclude_samples_from_count_df(
-            seq_count_df, sample_uid_to_sample_name_dict, sample_name_to_sample_uid_dict,
-            sample_uids_included, sample_uids_excluded, sample_names_included, sample_names_excluded,
-            sample_name_compiled_re_included, sample_name_compiled_re_excluded, dists=True
+            df=self.dist_df,
+            uid_to_name_dict=self.obj_name_to_obj_uid_dict, name_to_uid_dict=self.obj_name_to_obj_uid_dict,
+            sample_uids_included=sample_uids_included, sample_uids_excluded=sample_uids_excluded,
+            sample_names_included=sample_names_included, sample_names_excluded=sample_names_excluded,
+            sample_name_compiled_re_included=sample_name_compiled_re_included,
+            sample_name_compiled_re_excluded=sample_name_compiled_re_excluded, dists=True
         )
-        # TODO refactor the code form SPBars for checking the userinput sample include and exclude lists
+
 
         # Figure setup
-        self.fig, self.ax = self._setup_axis(ax)
+        if not self.no_plotting:
+            self.fig, self.ax = self._setup_axis(ax)
         foo = 'bar'
 
     def plot(self):
         """Plot the dendrogram"""
+        if self.no_plotting:
+            raise RuntimeError("no_plotting is enabled. Please disable this option to enable plotting.")
         condensed_dist = scipy.spatial.distance.squareform(self.dist_df)
         # this creates the linkage df that will be passed into the dendogram_sp function
         linkage = scipy.cluster.hierarchy.linkage(y=condensed_dist, optimal_ordering=True)

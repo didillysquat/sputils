@@ -24,9 +24,8 @@ class SPUtils:
                                        '\tsample_name_compiled_re_included\n'
                                        '\tsample_name_compiled_re_excluded\n')
 
-    @staticmethod
     def _exclude_samples_from_count_df(
-            self, count_df, sample_uid_to_sample_name_dict, sample_name_to_sample_uid_dict,
+            self, df, uid_to_name_dict, name_to_uid_dict,
             sample_uids_included, sample_uids_excluded, sample_names_included, sample_names_excluded,
             sample_name_compiled_re_included, sample_name_compiled_re_excluded, dists=False
     ):
@@ -39,28 +38,28 @@ class SPUtils:
         columns and index.
         """
         if sample_uids_included is not None:
-            return self._exclude_samples_sample_uids_included(sample_uids_included, count_df)
+            return self._exclude_samples_sample_uids_included(sample_uids_included, df, dists)
         elif sample_uids_excluded is not None:
-            return self._exclude_samples_sample_uids_excluded(count_df, sample_uids_excluded)
+            return self._exclude_samples_sample_uids_excluded(df, sample_uids_excluded, dists)
         elif sample_names_included is not None:
-            return self._exclude_samples_samples_names_included(count_df, sample_name_to_sample_uid_dict,
-                                                         sample_names_included)
+            return self._exclude_samples_samples_names_included(df, name_to_uid_dict,
+                                                                sample_names_included, dists)
         elif sample_names_excluded is not None:
-            return self._exclude_samples_samples_names_excluded(count_df, sample_name_to_sample_uid_dict,
-                                                         sample_names_excluded, sample_names_included)
+            return self._exclude_samples_samples_names_excluded(df, name_to_uid_dict,
+                                                                sample_names_excluded, sample_names_included, dists)
         elif sample_name_compiled_re_included is not None:
             return self._exclude_samples_sample_name_compiled_re_included(
-                count_df, sample_name_compiled_re_included,
-                sample_name_to_sample_uid_dict, sample_uid_to_sample_name_dict
+                df, sample_name_compiled_re_included,
+                name_to_uid_dict, uid_to_name_dict, dists
             )
         elif sample_name_compiled_re_excluded is not None:
             return self._exclude_samples_sample_name_compiled_re_excluded(
-                count_df, sample_name_compiled_re_excluded,
-                sample_name_to_sample_uid_dict, sample_uid_to_sample_name_dict
+                df, sample_name_compiled_re_excluded,
+                name_to_uid_dict, uid_to_name_dict, dists
             )
         else:
             # Then they are all none and there are no samples to be excluded.
-            return count_df
+            return df
 
     def _exclude_samples_samples_names_excluded(
             self, count_df, sample_name_to_sample_uid_dict, sample_names_excluded, sample_names_included, dist

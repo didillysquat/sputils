@@ -84,7 +84,7 @@ class SPBars(sputils.SPUtils):
 
         legend (bool): whether to plot a legend
 
-        relative_abundnce (bool): whether to plot the abundances as relative or absolute [True]
+        relative_abundance (bool): whether to plot the abundances as relative or absolute [True]
 
         num_seq_leg_cols (int): The number of sequences to plot in the legend. Sequences will be plotted in order
         of abundance. [20]
@@ -103,6 +103,9 @@ class SPBars(sputils.SPUtils):
 
         sample_outline (bool): If True, each sample will be separated by a black line. [False]
 
+        no_plotting (bool): If True, then no figure or ax object will be created. This is useful when you want to
+        run the __init__ of the class to get access to its objects without producing figures. [False]
+
         save_fig (bool): If True, the plot will be saved to the cwd or to the directory given by output_dir. [False]
 
         fig_output_dir (str): Path to the output dir where the figure will be output. [None]
@@ -117,10 +120,10 @@ class SPBars(sputils.SPUtils):
             sample_names_included=None, sample_names_excluded=None,
             sample_name_compiled_re_included=None, sample_name_compiled_re_excluded=None,
             orientation='h', legend=True,
-            relative_abundnce=True, num_seq_leg_cols=20, num_profile_leg_cols=20, seqs_right_bottom=False,
+            relative_abundance=True, num_seq_leg_cols=20, num_profile_leg_cols=20, seqs_right_bottom=False,
             reverse_seq_abund=False, reverse_profile_abund=False, color_by_genus=False, sample_outline=False,
-            save_fig=False, fig_output_dir=None, bar_ax=None, seq_leg_ax=None, profile_leg_ax=None, genus_leg_ax=None,
-            seq_color_dict=None, profile_color_dict=None, genus_color_dict=None
+            no_plotting=False, save_fig=False, fig_output_dir=None, bar_ax=None, seq_leg_ax=None, profile_leg_ax=None,
+            genus_leg_ax=None, seq_color_dict=None, profile_color_dict=None, genus_color_dict=None
     ):
 
         # arguments that will be used throughout the class
@@ -136,7 +139,7 @@ class SPBars(sputils.SPUtils):
         self.color_by_genus = color_by_genus
         self.num_profile_leg_cols = num_profile_leg_cols
         self.num_seq_leg_cols = num_seq_leg_cols
-        self.relative_abundance = relative_abundnce
+        self.relative_abundance = relative_abundance
         self.sample_outline = sample_outline
         self.save_fig = save_fig
         self.fig_output_dir = fig_output_dir
@@ -148,6 +151,7 @@ class SPBars(sputils.SPUtils):
         self.seq_color_dict = seq_color_dict
         self.profile_color_dict = profile_color_dict
         self.genus_color_dict = genus_color_dict
+        self.no_plotting = no_plotting
 
         # Check the inputs
         self._check_user_inputs(profile_count_table_path, sample_name_compiled_re_excluded,
@@ -176,7 +180,8 @@ class SPBars(sputils.SPUtils):
             )
 
         # Figure setup
-        self._setup_fig_and_ax(figsize)
+        if not self.no_plotting:
+            self._setup_fig_and_ax(figsize)
 
         # Patch setup
         # List for holding the rectangle patches used in making the bars
@@ -291,6 +296,8 @@ class SPBars(sputils.SPUtils):
             return prof_color_dict
 
     def plot(self):
+        if self.no_plotting:
+            raise RuntimeError("no_plotting is enabled. Please disable this option to enable plotting.")
         self._plot_bars()
         if self.save_fig:
             if self.fig_output_dir:
@@ -697,132 +704,6 @@ class SPBars(sputils.SPUtils):
         seq_count_df = seq_count_df.reindex(sorted_seq_index, axis=1)
 
         return (sample_name_to_sample_uid_dict, sample_uid_to_sample_name_dict, seq_count_df)
-
-    def _exclude_samples_from_count_df(
-            self, count_df, sample_uid_to_sample_name_dict, sample_name_to_sample_uid_dict,
-            sample_uids_included, sample_uids_excluded, sample_names_included, sample_names_excluded,
-            sample_name_compiled_re_included, sample_name_compiled_re_excluded
-    ):
-        """
-        Due to the checks we have already performed on the include/exclude arguments
-        only one of them will be not None. This is the set we will use to exclude samples from the df.
-        If all of them are none, then there are no samples to exclude.
-        """
-        if sample_uids_included is not None:
-            return self._exclude_samples_sample_uids_included(sample_uids_included, count_df)
-        elif sample_uids_excluded is not None:
-            return self._exclude_samples_sample_uids_excluded(count_df, sample_uids_excluded)
-        elif sample_names_included is not None:
-            return self._exclude_samples_samples_names_included(count_df, sample_name_to_sample_uid_dict,
-                                                         sample_names_included)
-        elif sample_names_excluded is not None:
-            return self._exclude_samples_samples_names_excluded(count_df, sample_name_to_sample_uid_dict,
-                                                         sample_names_excluded, sample_names_included)
-        elif sample_name_compiled_re_included is not None:
-            return self._exclude_samples_sample_name_compiled_re_included(
-                count_df, sample_name_compiled_re_included,
-                sample_name_to_sample_uid_dict, sample_uid_to_sample_name_dict
-            )
-        elif sample_name_compiled_re_excluded is not None:
-            return self._exclude_samples_sample_name_compiled_re_excluded(
-                count_df, sample_name_compiled_re_excluded,
-                sample_name_to_sample_uid_dict, sample_uid_to_sample_name_dict
-            )
-        else:
-            # Then they are all none and there are no samples to be excluded.
-            return count_df
-
-    def _exclude_samples_samples_names_excluded(self, count_df, sample_name_to_sample_uid_dict, sample_names_excluded,
-                                                sample_names_included):
-        # Return df containing only the included samples sorted according to that sampple order
-        print('Excluding samples according to user supplied sample_names_included list')
-        # Check that all uids are found in the seq_count_df
-        diff_set = set(sample_names_excluded).difference(set(sample_name_to_sample_uid_dict.keys()))
-        if not set(sample_names_included).issubset(set(sample_name_to_sample_uid_dict.keys())):
-            raise RuntimeError('The following uids that were specified in the sample_uids_excluded list are not'
-                               f'found in the SymPortal count table: {diff_set}')
-        else:
-            # All samples were found in the df and those listed can be exculded
-            print(f'Excluding {len(diff_set)} samples')
-            return count_df.drop(
-                index=[sample_name_to_sample_uid_dict[sample_name] for sample_name in sample_names_excluded]
-            )
-
-    def _exclude_samples_samples_names_included(self, count_df, sample_name_to_sample_uid_dict, sample_names_included):
-        # Return df containing only the included samples sorted according to that sampple order
-        print('Excluding samples according to user supplied sample_names_included list')
-        # Check that all uids are found in the seq_count_df
-        diff_set = set(sample_names_included).difference(set(sample_name_to_sample_uid_dict.keys()))
-        if not set(sample_names_included).issubset(set(sample_name_to_sample_uid_dict.keys())):
-            raise RuntimeError('The following uids that were specified in the sample_uids_included list are not'
-                               f'found in the SymPortal count table: {diff_set}')
-        else:
-            # All samples were found in the df and those not listed can be exculded
-            count_df = count_df.drop(
-                index=[sample_name_to_sample_uid_dict[sample_name] for sample_name in diff_set],
-                inplace=False
-            )
-            print(f'Excluding {len(diff_set)} samples')
-            return count_df.reindex(
-                [sample_name_to_sample_uid_dict[sample_name] for sample_name in sample_names_included],
-                axis=0
-            )
-
-    def _exclude_samples_sample_name_compiled_re_excluded(self, count_df, sample_name_compiled_re_excluded,
-                                                          sample_name_to_sample_uid_dict,
-                                                          sample_uid_to_sample_name_dict):
-        print('Excluding samples according to user supplied sample_name_compiled_re_excluded regular expression')
-        exclude = []
-        for sample_name in [sample_uid_to_sample_name_dict[sample_uid] for sample_uid in count_df.index]:
-            if sample_name_compiled_re_excluded.match(sample_name):
-                exclude.append(sample_name_to_sample_uid_dict[sample_name])
-        if not exclude:
-            raise RuntimeError('No sample names matched the user supplied sample_name_compiled_re_excluded.\n')
-        print(f'Excluding {len(exclude)} samples')
-        return count_df.drop(index=exclude)
-
-    def _exclude_samples_sample_name_compiled_re_included(
-            self, count_df, sample_name_compiled_re_included,
-            sample_name_to_sample_uid_dict, sample_uid_to_sample_name_dict
-    ):
-        print('Excluding samples according to user supplied sample_name_compiled_re_included regular expression')
-        keep = []
-        for sample_name in [sample_uid_to_sample_name_dict[sample_uid] for sample_uid in count_df.index]:
-            if sample_name_compiled_re_included.match(sample_name):
-                keep.append(sample_name_to_sample_uid_dict[sample_name])
-        if not keep:
-            raise RuntimeError('No sample names matched the user supplied sample_name_compiled_re_included.\n')
-        diff_set = set(keep).difference(count_df.index.values)
-        count_df = count_df.drop(index=diff_set)
-        print(f'Excluding {len(diff_set)} samples')
-        return count_df.reindex(keep, axis=0)
-
-    def _exclude_samples_sample_uids_excluded(self, count_df, sample_uids_excluded):
-        print('Excluding samples according to user supplied sample_uids_excluded list')
-        # Check that all the uids are found in the seq_count df
-        if not set(sample_uids_excluded).issubset(set(count_df.index.values)):
-            diff_set = set(sample_uids_excluded).difference(set(count_df.index.values))
-            raise RuntimeError('The following uids that were specified in the sample_uids_excluded list are not'
-                               f'found in the SymPortal count table: {diff_set}')
-        else:
-            # All samples were found in the df and those not listed can be exculded
-            print(f'Excluding {len(sample_uids_excluded)} samples')
-            return count_df.drop(index=sample_uids_excluded, inplace=False)
-
-    def _exclude_samples_sample_uids_included(self, sample_uids_included, count_df):
-        # Return df containing only the included samples sorted according to that sampple order
-        print('Excluding samples according to user supplied sample_uids_included list')
-        # Check that all uids are found in the seq_count_df
-        if not set(sample_uids_included).issubset(set(count_df.index.values)):
-            diff_set = set(sample_uids_included).difference(set(count_df.index.values))
-            raise RuntimeError('The following uids that were specified in the sample_uids_included list are not'
-                               f'found in the SymPortal count table: {diff_set}')
-        else:
-            # All samples were found in the df and those not listed can be exculded
-            diff_set = set(sample_uids_included).difference(set(count_df.index.values))
-            count_df = count_df.drop(index=diff_set, inplace=False)
-            print(f'Excluding {len(diff_set)} samples')
-            return count_df.reindex(sample_uids_included, axis=0)
 
     def _find_first_seq_position(self, seq_count_df):
         """
