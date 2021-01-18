@@ -110,6 +110,9 @@ class SPBars(sputils.SPUtils):
 
         fig_output_dir (str): Path to the output dir where the figure will be output. [None]
 
+        limit_genera (list): A list of genera to limit represented in the old Clade system.
+        Passing ['A'] would mean that only Symbiodinium sequences or profiles were plotted. [list('ABCDEFGHI')]
+
     Returns:
         tuple(matplotlib.pyplot.figure, matplotlib.axes.Axes): The figure and axes object that contain the plot
 
@@ -123,7 +126,8 @@ class SPBars(sputils.SPUtils):
             relative_abundance=True, num_seq_leg_cols=20, num_profile_leg_cols=20, seqs_right_bottom=False,
             reverse_seq_abund=False, reverse_profile_abund=False, color_by_genus=False, sample_outline=False,
             no_plotting=False, save_fig=False, fig_output_dir=None, bar_ax=None, seq_leg_ax=None, profile_leg_ax=None,
-            genus_leg_ax=None, seq_color_dict=None, profile_color_dict=None, genus_color_dict=None
+            genus_leg_ax=None, seq_color_dict=None, profile_color_dict=None, genus_color_dict=None,
+            limit_genera=list('ABCDEFGHI')
     ):
 
         # arguments that will be used throughout the class
@@ -152,6 +156,7 @@ class SPBars(sputils.SPUtils):
         self.profile_color_dict = profile_color_dict
         self.genus_color_dict = genus_color_dict
         self.no_plotting = no_plotting
+        self.limit_genera = limit_genera
 
         # Check the inputs
         self._check_user_inputs(profile_count_table_path, sample_name_compiled_re_excluded,
@@ -607,6 +612,10 @@ class SPBars(sputils.SPUtils):
         profile_count_df_abund.set_index(keys='ITS2 type profile UID', drop=True, inplace=True)
         profile_count_df_abund = profile_count_df_abund.drop(profile_count_df_abund.columns[0], axis=1)
 
+        # Drop sequences accorrding to genera_limit
+        profile_count_df_abund = profile_count_df_abund.loc[:, [col for col in list(profile_count_df_abund) if
+                                            profile_uid_to_profile_name_dict[col][0] in self.limit_genera]]
+
         profile_count_df_abund = self._exclude_samples_from_count_df(
             profile_count_df_abund, sample_uid_to_sample_name_dict, sample_name_to_sample_uid_dict,
             sample_uids_included, sample_uids_excluded, sample_names_included, sample_names_excluded,
@@ -670,6 +679,9 @@ class SPBars(sputils.SPUtils):
         seq_count_df.set_index(keys='sample_uid', drop=True, inplace=True)
         first_seq_index = self._find_first_seq_position(seq_count_df)
         seq_count_df = seq_count_df.iloc[:, first_seq_index:]
+
+        # Drop sequences accorrding to genera_limit
+        seq_count_df = seq_count_df.loc[:,[col for col in list(seq_count_df) if col[0] in self.limit_genera or col[-1] in self.limit_genera]]
 
         seq_count_df = self._exclude_samples_from_count_df(
             seq_count_df, sample_uid_to_sample_name_dict, sample_name_to_sample_uid_dict,
