@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import scipy.cluster.hierarchy
 import scipy.spatial.distance
 from datetime import datetime
+from sputils import sputils
 import numpy as np
 from matplotlib.patches import Rectangle
 from matplotlib.collections import PatchCollection
@@ -16,7 +17,7 @@ from sputils import spcolors
 import itertools
 
 
-class SPHierarchical:
+class SPHierarchical(sputils.SPUtils):
     """
     A utility script for creating hierarchical clustering dendrograms from SymPortal outputs
     Will take in a distance matrix SymPortal output and produce a dendrogram either as a new figure
@@ -61,16 +62,24 @@ class SPHierarchical:
     def __init__(
             self, dist_output_path=None, sample_profile=None, labels=False,
             color_dict=None, thickness_dict=None, orientation='h', ax=None, save_fig=False, output_dir=None,
-            sample_uids_included=None, sample_uids_excluded=None, sample_names_included=None,
-            sample_names_excluded=None, sample_name_compiled_re_included=None, sample_name_compiled_re_excluded=None
+            sample_uids_included=None, sample_uids_excluded=None,
+            sample_names_included=None, sample_names_excluded=None,
+            sample_name_compiled_re_included=None, sample_name_compiled_re_excluded=None,
     ):
+
+        self._check_exclude_arguments(
+            sample_name_compiled_re_excluded, sample_name_compiled_re_included,
+            sample_names_excluded, sample_names_included,
+            sample_uids_excluded, sample_uids_included
+        )
+
         self.labels = labels
         self.color_dict = color_dict
         self.thickness_dict = thickness_dict
         self.date_time = str(datetime.now()).split('.')[0].replace('-', '').replace(' ', 'T').replace(':', '')
         self.save_fig = save_fig
         self.output_dir = output_dir
-        self.sample_names_to_include = samples_names_to_include
+
         if orientation in ['h', 'horizontal']:
             self.orientation = 'h'
         elif orientation in ['v', 'vertical']:
@@ -99,6 +108,11 @@ class SPHierarchical:
             columns=list(self.obj_uid_to_obj_name_dict.keys()),
             index=list(self.obj_uid_to_obj_name_dict.keys())
         ).astype(float)
+        self.dist_df = self._exclude_samples_from_count_df(
+            seq_count_df, sample_uid_to_sample_name_dict, sample_name_to_sample_uid_dict,
+            sample_uids_included, sample_uids_excluded, sample_names_included, sample_names_excluded,
+            sample_name_compiled_re_included, sample_name_compiled_re_excluded, dists=True
+        )
         # TODO refactor the code form SPBars for checking the userinput sample include and exclude lists
 
         # Figure setup
