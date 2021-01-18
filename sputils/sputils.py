@@ -85,11 +85,13 @@ class SPUtils:
         # Return df containing only the included samples sorted according to that sampple order
         print('Excluding samples according to user supplied sample_names_included list')
         # Check that all uids are found in the seq_count_df
-        diff_set = set(sample_names_included).difference(set(sample_name_to_sample_uid_dict.keys()))
+
         if not set(sample_names_included).issubset(set(sample_name_to_sample_uid_dict.keys())):
+            diff_set = set(sample_names_included).difference(set(sample_name_to_sample_uid_dict.keys()))
             raise RuntimeError('The following uids that were specified in the sample_uids_included list are not'
                                f'found in the SymPortal count table: {diff_set}')
         else:
+            diff_set = set(sample_names_included).symmetric_difference(set(sample_name_to_sample_uid_dict.keys()))
             # All samples were found in the df and those not listed can be exculded
             count_df = self._drop_from_df(
                 df=count_df, labels=[sample_name_to_sample_uid_dict[sample_name] for sample_name in diff_set],
@@ -124,7 +126,7 @@ class SPUtils:
                 keep.append(sample_name_to_sample_uid_dict[sample_name])
         if not keep:
             raise RuntimeError('No sample names matched the user supplied sample_name_compiled_re_included.\n')
-        diff_set = set(keep).difference(count_df.index.values)
+        diff_set = set(keep).symmetric_difference(count_df.index.values)
         count_df = self._drop_from_df(df=count_df, labels=diff_set, dist=dist)
         print(f'Excluding {len(diff_set)} samples')
         return count_df.reindex(keep, axis=0)
@@ -151,7 +153,7 @@ class SPUtils:
                                f'found in the SymPortal count table: {diff_set}')
         else:
             # All samples were found in the df and those not listed can be exculded
-            diff_set = set(sample_uids_included).difference(set(count_df.index.values))
+            diff_set = set(sample_uids_included).symmetric_difference(set(count_df.index.values))
             count_df = self._drop_from_df(df=count_df, labels=diff_set, dist=dist)
             print(f'Excluding {len(diff_set)} samples')
             return count_df.reindex(sample_uids_included, axis=0)
