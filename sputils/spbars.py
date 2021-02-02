@@ -99,6 +99,11 @@ class SPBars(sputils.SPUtils):
 
         reverse_profile_abund (bool): When True, the order in which the profiles are plotted will be reversed. [False]
 
+        seq_profile_scalar (tuple(<float>,<float>)): When plot_type is seq_and_profile, and realtive_abundance is True,
+        by default the the sequence and profile bars are plotted to the same height (1 and -1). By passing
+        a tuple to this argument the relative abundance of the sequence and profile bars, respectively
+        will be scaled according to the value of the tuple. [(1.0,1.0)].
+
         color_by_genus (bool): If True, sequences and profiles will be colored according to their genus. [False]
 
         sample_outline (bool): If True, each sample will be separated by a black line. [False]
@@ -127,7 +132,7 @@ class SPBars(sputils.SPUtils):
             reverse_seq_abund=False, reverse_profile_abund=False, color_by_genus=False, sample_outline=False,
             no_plotting=False, save_fig=False, fig_output_dir=None, bar_ax=None, seq_leg_ax=None, profile_leg_ax=None,
             genus_leg_ax=None, seq_color_dict=None, profile_color_dict=None, genus_color_dict=None,
-            limit_genera=list('ABCDEFGHI')
+            limit_genera=list('ABCDEFGHI'), seq_profile_scalar=(1.0, 1.0)
     ):
 
         # arguments that will be used throughout the class
@@ -157,6 +162,7 @@ class SPBars(sputils.SPUtils):
         self.genus_color_dict = genus_color_dict
         self.no_plotting = no_plotting
         self.limit_genera = limit_genera
+        self.seq_profile_scalar = seq_profile_scalar
 
         # Check the inputs
         self._check_user_inputs(profile_count_table_path, sample_name_compiled_re_excluded,
@@ -337,16 +343,16 @@ class SPBars(sputils.SPUtils):
         else:
             if self.seqs_right_bottom:
                 self._make_rect_and_cols(color_dict=self.seq_color_dict, color_list=color_list, df=self.seq_count_df,
-                                         pos_neg='positive')
+                                         pos_neg='negative')
                 self._make_rect_and_cols(
                     color_dict=self.profile_color_dict, color_list=color_list, df=self.profile_count_df,
-                    pos_neg='negative'
+                    pos_neg='positive'
                 )
                 self._set_ax_lims_both_plot()
             else:
-                self._make_rect_and_cols(color_dict=self.seq_color_dict, color_list=color_list, df=self.seq_count_df, pos_neg='negative')
+                self._make_rect_and_cols(color_dict=self.seq_color_dict, color_list=color_list, df=self.seq_count_df, pos_neg='positive')
                 self._make_rect_and_cols(
-                    color_dict=self.profile_color_dict, color_list=color_list, df=self.profile_count_df, pos_neg='positive'
+                    color_dict=self.profile_color_dict, color_list=color_list, df=self.profile_count_df, pos_neg='negative'
                 )
                 self._set_ax_lims_both_plot()
 
@@ -377,15 +383,15 @@ class SPBars(sputils.SPUtils):
         if self.orientation == 'v':
             self.bar_ax.set_ylim(-0.5, len(self.seq_count_df.index) - 0.5)
             if self.seqs_right_bottom:
-                self.bar_ax.set_xlim(-1 * self.profile_count_df.to_numpy().max(), self.seq_count_df.to_numpy().max())
+                self.bar_ax.set_xlim(self.profile_count_df.sum(axis=1).to_numpy().max(), -1 * self.seq_count_df.sum(axis=1).to_numpy().max())
             else:
-                self.bar_ax.set_xlim(-1 * self.profile_count_df.to_numpy().max(), self.seq_count_df.to_numpy().max())
+                self.bar_ax.set_xlim(-1 * self.profile_count_df.sum(axis=1).to_numpy().max(), self.seq_count_df.sum(axis=1).to_numpy().max())
         else:
             self.bar_ax.set_xlim(-0.5, len(self.seq_count_df.index) - 0.5)
             if self.seqs_right_bottom:
-                self.bar_ax.set_ylim(-1 * self.profile_count_df.to_numpy().max(), self.seq_count_df.to_numpy().max())
+                self.bar_ax.set_ylim(self.profile_count_df.sum(axis=1).to_numpy().max(), -1 * self.seq_count_df.sum(axis=1).to_numpy().max())
             else:
-                self.bar_ax.set_ylim(-1 * self.profile_count_df.to_numpy().max(), self.seq_count_df.to_numpy().max())
+                self.bar_ax.set_ylim(-1 * self.profile_count_df.sum(axis=1).to_numpy().max(), self.seq_count_df.sum(axis=1).to_numpy().max())
 
     def _make_rect_and_cols(self, color_dict, color_list, df, pos_neg='positive'):
         index_for_plot = 0
@@ -642,6 +648,7 @@ class SPBars(sputils.SPUtils):
             )
             # Then mask nan with 0
             profile_count_df_abund.fillna(0, inplace=True)
+            profile_count_df_abund = profile_count_df_abund  * self.seq_profile_scalar[1]
 
         # sort by column abundances, highest first
         if self.reverse_profile_abund:
@@ -706,7 +713,7 @@ class SPBars(sputils.SPUtils):
         if self.relative_abundance:
             seq_count_df = seq_count_df.div(
                 seq_count_df.sum(axis=1), axis=0
-            )
+            ) * self.seq_profile_scalar[0]
 
         # sort by seq abundance, highest first
         if self.reverse_seq_abund:
