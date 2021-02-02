@@ -366,13 +366,13 @@ class SPBars(sputils.SPUtils):
     def _set_ax_lims_and_outline_only_plot(self, df):
         if self.orientation == 'v':
             self.bar_ax.set_ylim(-0.5, len(df) - 0.5)
-            self.bar_ax.set_xlim(0, df.to_numpy().max())
+            self.bar_ax.set_xlim(0, df.sum(axis=1).to_numpy().max())
             if self.sample_outline:
                 for y in np.arange(0.5, len(df.index) - 1.5):
                     # TODO dynamically program the lw
                     self.bar_ax.axhline(y=y, lw=0.1, c='black')
         else:
-            self.bar_ax.set_ylim(0, df.to_numpy().max())
+            self.bar_ax.set_ylim(0, df.to_numpy().sum(axis=1).max())
             self.bar_ax.set_xlim(-0.5, len(df) - 0.5)
             if self.sample_outline:
                 for x in np.arange(0.5, len(df.index) - 1.5):
