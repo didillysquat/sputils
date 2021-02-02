@@ -105,7 +105,7 @@ class SPHierarchical(sputils.SPUtils):
 
         with open(dist_output_path, 'r') as f:
             f_list = [_.split('\t') for _ in f]
-        self.obj_name_to_obj_uid_dict = {_[0]: _[1] for _ in f_list}
+        self.obj_name_to_obj_uid_dict = {_[0]: int(_[1]) for _ in f_list}
         self.obj_uid_to_obj_name_dict = {v: k for k, v in self.obj_name_to_obj_uid_dict.items()}
         self.dist_df = pd.DataFrame(
             data=[_[2:] for _ in f_list],
@@ -146,7 +146,7 @@ class SPHierarchical(sputils.SPUtils):
                 plt.savefig(f'{self.date_time}_dendro.png', dpi=1200)
             else:
                 plt.savefig(os.path.join(self.output_dir, f'{self.date_time}_dendro.svg'))
-                plt.savefig(os.path.join(self.output_dir, f'{self.date_time}_dendro.png', dpi=1200))
+                plt.savefig(os.path.join(self.output_dir, f'{self.date_time}_dendro.png'), dpi=1200)
 
         foo = 'bar'
 
