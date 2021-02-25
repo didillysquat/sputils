@@ -105,6 +105,10 @@ class SPHierarchical(sputils.SPUtils):
 
         with open(dist_output_path, 'r') as f:
             f_list = [_.split('\t') for _ in f]
+        # In the older .dist files there is a single line at the top that holds the number of samples
+        # We need to delete this
+        if len(f_list[0]) == 1:
+            f_list = f_list[1:]
         self.obj_name_to_obj_uid_dict = {_[0]: int(_[1]) for _ in f_list}
         self.obj_uid_to_obj_name_dict = {v: k for k, v in self.obj_name_to_obj_uid_dict.items()}
         self.dist_df = pd.DataFrame(
@@ -140,6 +144,11 @@ class SPHierarchical(sputils.SPUtils):
             self.labels, link_color_func=lambda k: '#000000', orientation='top', get_leaves=True,
             show_leaf_counts=True
         )
+
+        # Out put the sample order of the dendrogram for easy access
+        self.dendrogram_sample_order_uid = self.dendrogram['ivl']
+        self.dendrogram_sample_order_name = [self.obj_uid_to_obj_name_dict[uid] for uid in self.dendrogram['ivl']]
+
         if self.save_fig:
             if self.output_dir is None:
                 plt.savefig(f'{self.date_time}_dendro.svg')
