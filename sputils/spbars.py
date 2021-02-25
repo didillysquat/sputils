@@ -13,6 +13,7 @@ from sputils import spcolors
 from sputils import sputils
 import itertools
 from datetime import datetime
+import math
 
 
 class SPBars(sputils.SPUtils):
@@ -38,12 +39,12 @@ class SPBars(sputils.SPUtils):
         If None, a fig and ax will be generated and returned. [None]
 
         seq_leg_ax (matplotlib.axes.Axes): if passed and plot_type is 'seq_only' or 'seq_and_profile',
-        the axis will be used for plotting the sequences legend. Other wise a new axis will be generated. [None]
+        the axis will be used for plotting the sequences legend. Otherwise a new axis will be generated. [None]
 
         profile_leg_ax (matplotlib.axes.Axes): if passed and plot_type is 'profile_only' or 'seq_and_profile',
         the axis will be used for plotting the profiles legend. Otherwise a new axis will be generated. [None]
 
-        genus_leg_ax (matplotlib.axes.Axes): if passed and color_by_genus is True,
+        genera_leg_ax (matplotlib.axes.Axes): if passed and color_by_genus is True,
         the axis will be used for plotting the legend. Otherwise a new axis will be generated. [None]
 
         seq_color_dict (dict): if passed this dictionary will be used for plotting sequence abundances.
@@ -131,7 +132,7 @@ class SPBars(sputils.SPUtils):
             relative_abundance=True, num_seq_leg_cols=20, num_profile_leg_cols=20, seqs_right_bottom=False,
             reverse_seq_abund=False, reverse_profile_abund=False, color_by_genus=False, sample_outline=False,
             no_plotting=False, save_fig=False, fig_output_dir=None, bar_ax=None, seq_leg_ax=None, profile_leg_ax=None,
-            genus_leg_ax=None, seq_color_dict=None, profile_color_dict=None, genus_color_dict=None,
+            genera_leg_ax=None, seq_color_dict=None, profile_color_dict=None, genus_color_dict=None,
             limit_genera=list('ABCDEFGHI'), seq_profile_scalar=(1.0, 1.0)
     ):
 
@@ -156,7 +157,7 @@ class SPBars(sputils.SPUtils):
         self.bar_ax = bar_ax
         self.seq_leg_ax = seq_leg_ax
         self.profile_leg_ax = profile_leg_ax
-        self.genus_leg_ax = genus_leg_ax
+        self.genera_leg_ax = genera_leg_ax
         self.seq_color_dict = seq_color_dict
         self.profile_color_dict = profile_color_dict
         self.genus_color_dict = genus_color_dict
@@ -168,6 +169,8 @@ class SPBars(sputils.SPUtils):
         self._check_user_inputs(profile_count_table_path, sample_name_compiled_re_excluded,
                                 sample_name_compiled_re_included, sample_names_excluded, sample_names_included,
                                 sample_uids_excluded, sample_uids_included, seq_count_table_path)
+
+        self._check_count_table_paths_provided_by_user(profile_count_table_path, seq_count_table_path)
 
         if seq_count_table_path:
             (
@@ -199,6 +202,22 @@ class SPBars(sputils.SPUtils):
         self.bar_patches = []
 
         self._setup_colors()
+
+    def _check_count_table_paths_provided_by_user(self, profile_count_table_path, seq_count_table_path):
+        if self.plot_type == 'seq_only':
+            # make sure that seq_count_table_path has been provided
+            if seq_count_table_path is None:
+                raise RuntimeError("You have not provided a seq_count_table_path")
+        elif self.plot_type == 'profile_only':
+            if profile_count_table_path is None:
+                raise RuntimeError("You have not provided a profile_count_table_path")
+        elif self.plot_type == 'seq_and_profile':
+            if seq_count_table_path is None and profile_count_table_path is None:
+                raise RuntimeError("You have provided neither a seq_count_table_path nor a profile_count_table_path")
+            if seq_count_table_path is None:
+                raise RuntimeError("You have not provided a seq_count_table_path")
+            if profile_count_table_path is None:
+                raise RuntimeError("You have not provided a profile_count_table_path")
 
     def _check_user_inputs(self, profile_count_table_path, sample_name_compiled_re_excluded,
                            sample_name_compiled_re_included, sample_names_excluded, sample_names_included,
@@ -306,10 +325,35 @@ class SPBars(sputils.SPUtils):
                     prof_color_dict[prof_uid] = next(self.grey_iterator)
             return prof_color_dict
 
+    def plot_only_legend(self, seq_leg_ax=None, profile_leg_ax=None, genera_leg_ax=None):
+        """
+        This can be used to plot a legend or set of legends to a provided axis/axes.
+        Any axes provided will override any current SPBars axes instance's
+        :return:
+        """
+        if seq_leg_ax is not None:
+            self.seq_leg_ax = seq_leg_ax
+        if profile_leg_ax is not None:
+            self.profile_leg_ax = profile_leg_ax
+        if genera_leg_ax is not None:
+            self.genera_leg_ax = genera_leg_ax
+        if self.plot_type == 'seq_only' and self.seq_leg_ax is None:
+            raise RuntimeError("A valid seq_leg_ax does not exist")
+        elif self.plot_type == 'profile_only' and self.profile_leg_ax is None:
+            raise RuntimeError("A valid profile_leg_ax does not exist")
+        elif self.plot_type == 'seq_and_profile' and (self.seq_leg_ax is None or self.profile_leg_ax is None):
+            raise RuntimeError("A valid missing one or both of a valid seq_leg_ax or profile_leg_ax")
+        if self.color_by_genus and self.genera_leg_ax is None:
+            raise RuntimeError("A valid genera_leg_ax does not exist")
+        self._plot_legends()
+
     def plot(self):
         if self.no_plotting:
             raise RuntimeError("no_plotting is enabled. Please disable this option to enable plotting.")
         self._plot_bars()
+        #TODO do legend plotting
+        if self.legend:
+            self._plot_legends()
         if self.save_fig:
             if self.fig_output_dir:
                 if not os.path.exists(self.fig_output_dir):
@@ -319,6 +363,76 @@ class SPBars(sputils.SPUtils):
             else:
                 plt.savefig(f'{self.date_time}.svg')
                 plt.savefig(f'{self.date_time}.png', dpi=1200)
+
+    def _plot_legends(self):
+        if self.color_by_genus:
+            # plotting one legend coloured by genus
+            # TODO check that we have converted the seq_count_dict
+            # TODO implement the genera legend
+            self._plot_a_legend(ax=self.genera_leg_ax)
+        elif self.plot_type == 'seq_only':
+            # plotting one seq legend
+            self._plot_a_legend(ax=self.seq_leg_ax, df=self.seq_count_df, seq_profile='seq')
+        elif self.plot_type == 'profile_only':
+            # plotting one profile legend
+            self._plot_a_legend(ax=self.profile_leg_ax, df=self.profile_count_df, seq_profile='profile')
+        elif self.plot_type == 'seq_and_profile':
+            # plotting two legends one profile one seq
+            self._plot_a_legend(ax=self.seq_leg_ax, df=self.seq_count_df, seq_profile='seq')
+            self._plot_a_legend(ax=self.profile_leg_ax, df=self.profile_count_df, seq_profile='profile')
+
+
+    def _plot_a_legend(self, ax, df=None, seq_profile=None):
+        # we will plot according to the relative shape of the axis
+        # we will aim for a fixed number of legend items for a given width
+        # 1 seq legend per inch
+        # 1 profile legend per 3 inches (minimum one per row obviously)
+        bbox = ax.get_window_extent().transformed(ax.figure.dpi_scale_trans.inverted())
+        ax_width, ax_height = bbox.width, bbox.height
+        if self.color_by_genus:
+            raise NotImplementedError("color by genus legend not implemented yet")
+        if seq_profile == 'seq':
+            # we are plotting seqs
+            elements_per_row = max(1, math.floor(ax_width))
+            num_elements = self.num_seq_leg_cols
+            color_dict = self.seq_color_dict
+        elif seq_profile == 'profile':
+            # we are plotting seqs
+            elements_per_row = max(1, math.floor(ax_width/3))
+            num_elements = self.num_profile_leg_cols
+            color_dict = self.profile_color_dict
+            # Convert the profile uids to names so that we can use them
+            df.columns = [self.profile_uid_to_profile_name_dict[_] for _ in list(df)]
+        number_of_rows = round(self.num_seq_leg_cols / elements_per_row)
+        elements_in_last_row = self.num_seq_leg_cols % elements_per_row
+        # To make life easy lets work with ax coords of the number of elements wide
+        # and the number of elements deep
+        ax.set_ylim(0, number_of_rows)
+        ax.set_xlim(0, elements_per_row)
+        ax.invert_yaxis()
+
+        # Now plot the elements in order of the df
+        rect_list = []
+        for i, element in enumerate(list(df)[:num_elements]):
+            # We can make the box always 0.2 wide
+            # The text can take up the rest of the space
+            # the box x will start at i % elements_per_row
+            # the box y will always start at math.floor(i / elements_per_row)
+            # We will leave a buffer of 0.2 above and below the box
+            x = i % elements_per_row
+            y = math.floor(i / elements_per_row) + 0.2
+            rect_list.append(Rectangle((x,y), width=0.2, height=0.6, color=color_dict[element]))
+            ax.text(
+                x=x + 0.25, y=y + 0.3, s=element,
+                ha='left', va='top', fontsize='small')
+        pc = PatchCollection(rect_list, match_original=True)
+        ax.add_collection(pc)
+        ax.spines['top'].set_visible(False)
+        ax.spines['left'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['bottom'].set_visible(False)
+        ax.set_xticks([])
+        ax.set_yticks([])
 
     def _plot_bars(self):
         """
@@ -458,10 +572,10 @@ class SPBars(sputils.SPUtils):
         # Given that the user has passed us a bar ax, they should also have passed us the required axes
         # for plotting the legends
         if self.color_by_genus:
-            if self.genus_leg_ax is None:
+            if self.genera_leg_ax is None:
                 raise RuntimeError('You have passed a bar_ax but you have not passed an axis for plotting '
                                    'the genus color legend on.\n'
-                                   'Either set legend to False, or provide an axis using genus_leg_ax.\n')
+                                   'Either set legend to False, or provide an axis using genera_leg_ax.\n')
         else:
             if self.plot_type == 'seq_only':
                 if self.seq_leg_ax is None:
