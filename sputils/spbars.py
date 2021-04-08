@@ -401,8 +401,8 @@ class SPBars(sputils.SPUtils):
             elements_per_row = max(1, math.floor(ax_width/3))
             num_elements = self.num_profile_leg_cols
             color_dict = self.profile_color_dict
-            # Convert the profile uids to names so that we can use them
-            df.columns = [self.profile_uid_to_profile_name_dict[_] for _ in list(df)]
+            # # Convert the profile uids to names so that we can use them
+            # df.columns = [self.profile_uid_to_profile_name_dict[_] for _ in list(df)]
         number_of_rows = round(self.num_seq_leg_cols / elements_per_row)
         elements_in_last_row = self.num_seq_leg_cols % elements_per_row
         # To make life easy lets work with ax coords of the number of elements wide
@@ -422,9 +422,14 @@ class SPBars(sputils.SPUtils):
             x = i % elements_per_row
             y = math.floor(i / elements_per_row) + 0.2
             rect_list.append(Rectangle((x,y), width=0.2, height=0.6, color=color_dict[element]))
-            ax.text(
-                x=x + 0.25, y=y + 0.3, s=element,
-                ha='left', va='top', fontsize='small')
+            if seq_profile == 'seq':
+                ax.text(
+                    x=x + 0.25, y=y + 0.3, s=element,
+                    ha='left', va='top', fontsize='small')
+            else:
+                ax.text(
+                    x=x + 0.25, y=y + 0.3, s=self.profile_uid_to_profile_name_dict[element],
+                    ha='left', va='top', fontsize='small')
         pc = PatchCollection(rect_list, match_original=True)
         ax.add_collection(pc)
         ax.spines['top'].set_visible(False)
