@@ -390,46 +390,59 @@ class SPBars(sputils.SPUtils):
         bbox = ax.get_window_extent().transformed(ax.figure.dpi_scale_trans.inverted())
         ax_width, ax_height = bbox.width, bbox.height
         if self.color_by_genus:
-            raise NotImplementedError("color by genus legend not implemented yet")
+            elements_per_row = max(1, math.floor(ax_width))
+            num_elements = len(self.genus_color_dict)
+            color_dict = self.genus_color_dict
         if seq_profile == 'seq':
             # we are plotting seqs
             elements_per_row = max(1, math.floor(ax_width))
             num_elements = self.num_seq_leg_cols
             color_dict = self.seq_color_dict
+            number_of_rows = math.ceil(self.num_seq_leg_cols / elements_per_row)
         elif seq_profile == 'profile':
             # we are plotting seqs
             elements_per_row = max(1, math.floor(ax_width/3))
             num_elements = self.num_profile_leg_cols
             color_dict = self.profile_color_dict
+            number_of_rows = math.ceil(self.num_profile_leg_cols / elements_per_row)
             # # Convert the profile uids to names so that we can use them
             # df.columns = [self.profile_uid_to_profile_name_dict[_] for _ in list(df)]
-        number_of_rows = round(self.num_seq_leg_cols / elements_per_row)
-        elements_in_last_row = self.num_seq_leg_cols % elements_per_row
+
         # To make life easy lets work with ax coords of the number of elements wide
         # and the number of elements deep
         ax.set_ylim(0, number_of_rows)
         ax.set_xlim(0, elements_per_row)
         ax.invert_yaxis()
-
-        # Now plot the elements in order of the df
-        rect_list = []
-        for i, element in enumerate(list(df)[:num_elements]):
-            # We can make the box always 0.2 wide
-            # The text can take up the rest of the space
-            # the box x will start at i % elements_per_row
-            # the box y will always start at math.floor(i / elements_per_row)
-            # We will leave a buffer of 0.2 above and below the box
-            x = i % elements_per_row
-            y = math.floor(i / elements_per_row) + 0.2
-            rect_list.append(Rectangle((x,y), width=0.2, height=0.6, color=color_dict[element]))
-            if seq_profile == 'seq':
+        if self.color_by_genus:
+            # Plot according to the genus color dictionary
+            rect_list = []
+            for i, (genus, color) in enumerate(list(self.genus_color_dict.items())):
+                x = i % elements_per_row
+                y = math.floor(i / elements_per_row) + 0.2
+                rect_list.append(Rectangle((x, y), width=0.2, height=0.6, color=color))
                 ax.text(
-                    x=x + 0.25, y=y + 0.3, s=element,
+                    x=x + 0.25, y=y + 0.3, s=f"Clade {genus}",
                     ha='left', va='top', fontsize='small')
-            else:
-                ax.text(
-                    x=x + 0.25, y=y + 0.3, s=self.profile_uid_to_profile_name_dict[element],
-                    ha='left', va='top', fontsize='small')
+        else:
+            # Now plot the elements in order of the df
+            rect_list = []
+            for i, element in enumerate(list(df)[:num_elements]):
+                # We can make the box always 0.2 wide
+                # The text can take up the rest of the space
+                # the box x will start at i % elements_per_row
+                # the box y will always start at math.floor(i / elements_per_row)
+                # We will leave a buffer of 0.2 above and below the box
+                x = i % elements_per_row
+                y = math.floor(i / elements_per_row) + 0.2
+                rect_list.append(Rectangle((x,y), width=0.2, height=0.6, color=color_dict[element]))
+                if seq_profile == 'seq':
+                    ax.text(
+                        x=x + 0.25, y=y + 0.3, s=element,
+                        ha='left', va='top', fontsize='small')
+                else:
+                    ax.text(
+                        x=x + 0.25, y=y + 0.3, s=self.profile_uid_to_profile_name_dict[element],
+                        ha='left', va='top', fontsize='small')
         pc = PatchCollection(rect_list, match_original=True)
         ax.add_collection(pc)
         ax.spines['top'].set_visible(False)

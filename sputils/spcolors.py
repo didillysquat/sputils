@@ -85,8 +85,8 @@ genus_color_dict = {
                     'G': "#7FFFFF",
                     # Pastel Magenta
                     'H': "#FF7FFF",
-                    # Pastel light green
-                    'I': "#BFFF7F"
+                    # Grey
+                    'I': "#74737A"
                 }
 
 def create_color_list(
