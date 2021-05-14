@@ -400,7 +400,7 @@ class SPBars(sputils.SPUtils):
             color_dict = self.seq_color_dict
             number_of_rows = math.ceil(self.num_seq_leg_cols / elements_per_row)
         elif seq_profile == 'profile':
-            # we are plotting seqs
+            # we are plotting profiles
             elements_per_row = max(1, math.floor(ax_width/3))
             num_elements = self.num_profile_leg_cols
             color_dict = self.profile_color_dict
@@ -436,13 +436,23 @@ class SPBars(sputils.SPUtils):
                 y = math.floor(i / elements_per_row) + 0.2
                 rect_list.append(Rectangle((x,y), width=0.2, height=0.6, color=color_dict[element]))
                 if seq_profile == 'seq':
-                    ax.text(
-                        x=x + 0.25, y=y + 0.3, s=element,
-                        ha='left', va='top', fontsize='small')
+                    if self.orientation == 'v':
+                        ax.text(
+                            x=x + 0.25, y=y + 0.3, s=element,
+                            ha='left', va='center', fontsize='small')
+                    else:
+                        ax.text(
+                            x=x + 0.25, y=y + 0.3, s=element,
+                            ha='left', va='top', fontsize='small')
                 else:
-                    ax.text(
-                        x=x + 0.25, y=y + 0.3, s=self.profile_uid_to_profile_name_dict[element],
-                        ha='left', va='top', fontsize='small')
+                    if self.orientation == 'v':
+                        ax.text(
+                            x=x + 0.25, y=y + 0.3, s=self.profile_uid_to_profile_name_dict[element],
+                            ha='left', va='center', fontsize='small')
+                    else:
+                        ax.text(
+                            x=x + 0.25, y=y + 0.3, s=self.profile_uid_to_profile_name_dict[element],
+                            ha='left', va='top', fontsize='small')
         pc = PatchCollection(rect_list, match_original=True)
         ax.add_collection(pc)
         ax.spines['top'].set_visible(False)
