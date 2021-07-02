@@ -112,7 +112,7 @@ class SPBars(sputils.SPUtils):
         no_plotting (bool): If True, then no figure or ax object will be created. This is useful when you want to
         run the __init__ of the class to get access to its objects without producing figures. [False]
 
-        save_fig (bool): If True, the plot will be saved to the cwd or to the directory given by output_dir. [False]
+        save_fig (bool): If True, the plot will be saved to the cwd or to the directory given by fig_output_dir. [False]
 
         fig_output_dir (str): Path to the output dir where the figure will be output. [None]
 
@@ -381,7 +381,6 @@ class SPBars(sputils.SPUtils):
             self._plot_a_legend(ax=self.seq_leg_ax, df=self.seq_count_df, seq_profile='seq')
             self._plot_a_legend(ax=self.profile_leg_ax, df=self.profile_count_df, seq_profile='profile')
 
-
     def _plot_a_legend(self, ax, df=None, seq_profile=None):
         # we will plot according to the relative shape of the axis
         # we will aim for a fixed number of legend items for a given width
@@ -393,18 +392,19 @@ class SPBars(sputils.SPUtils):
             elements_per_row = max(1, math.floor(ax_width))
             num_elements = len(self.genus_color_dict)
             color_dict = self.genus_color_dict
-        if seq_profile == 'seq':
+            number_of_rows = round(num_elements / elements_per_row)
+        elif seq_profile == 'seq':
             # we are plotting seqs
             elements_per_row = max(1, math.floor(ax_width))
             num_elements = self.num_seq_leg_cols
             color_dict = self.seq_color_dict
-            number_of_rows = math.ceil(self.num_seq_leg_cols / elements_per_row)
+            number_of_rows = round(self.num_seq_leg_cols / elements_per_row)
         elif seq_profile == 'profile':
-            # we are plotting profiles
-            elements_per_row = max(1, math.floor(ax_width/3))
+            # we are plotting seqs
+            elements_per_row = max(1, math.floor(ax_width / 3))
             num_elements = self.num_profile_leg_cols
             color_dict = self.profile_color_dict
-            number_of_rows = math.ceil(self.num_profile_leg_cols / elements_per_row)
+            number_of_rows = round(self.num_seq_leg_cols / elements_per_row)
             # # Convert the profile uids to names so that we can use them
             # df.columns = [self.profile_uid_to_profile_name_dict[_] for _ in list(df)]
 
@@ -413,19 +413,17 @@ class SPBars(sputils.SPUtils):
         ax.set_ylim(0, number_of_rows)
         ax.set_xlim(0, elements_per_row)
         ax.invert_yaxis()
+        rect_list = []
         if self.color_by_genus:
-            # Plot according to the genus color dictionary
-            rect_list = []
-            for i, (genus, color) in enumerate(list(self.genus_color_dict.items())):
+            for i, element in enumerate(self.genus_color_dict.items()):
                 x = i % elements_per_row
                 y = math.floor(i / elements_per_row) + 0.2
-                rect_list.append(Rectangle((x, y), width=0.2, height=0.6, color=color))
+                rect_list.append(Rectangle((x, y), width=0.2, height=0.6, color=element[1]))
                 ax.text(
-                    x=x + 0.25, y=y + 0.3, s=f"Clade {genus}",
+                    x=x + 0.25, y=y + 0.3, s=element[0],
                     ha='left', va='top', fontsize='small')
         else:
             # Now plot the elements in order of the df
-            rect_list = []
             for i, element in enumerate(list(df)[:num_elements]):
                 # We can make the box always 0.2 wide
                 # The text can take up the rest of the space
@@ -434,25 +432,15 @@ class SPBars(sputils.SPUtils):
                 # We will leave a buffer of 0.2 above and below the box
                 x = i % elements_per_row
                 y = math.floor(i / elements_per_row) + 0.2
-                rect_list.append(Rectangle((x,y), width=0.2, height=0.6, color=color_dict[element]))
+                rect_list.append(Rectangle((x, y), width=0.2, height=0.6, color=color_dict[element]))
                 if seq_profile == 'seq':
-                    if self.orientation == 'v':
-                        ax.text(
-                            x=x + 0.25, y=y + 0.3, s=element,
-                            ha='left', va='center', fontsize='small')
-                    else:
-                        ax.text(
-                            x=x + 0.25, y=y + 0.3, s=element,
-                            ha='left', va='top', fontsize='small')
+                    ax.text(
+                        x=x + 0.25, y=y + 0.3, s=element,
+                        ha='left', va='top', fontsize='small')
                 else:
-                    if self.orientation == 'v':
-                        ax.text(
-                            x=x + 0.25, y=y + 0.3, s=self.profile_uid_to_profile_name_dict[element],
-                            ha='left', va='center', fontsize='small')
-                    else:
-                        ax.text(
-                            x=x + 0.25, y=y + 0.3, s=self.profile_uid_to_profile_name_dict[element],
-                            ha='left', va='top', fontsize='small')
+                    ax.text(
+                        x=x + 0.25, y=y + 0.3, s=self.profile_uid_to_profile_name_dict[element],
+                        ha='left', va='top', fontsize='small')
         pc = PatchCollection(rect_list, match_original=True)
         ax.add_collection(pc)
         ax.spines['top'].set_visible(False)
@@ -514,7 +502,9 @@ class SPBars(sputils.SPUtils):
                     # TODO dynamically program the lw
                     self.bar_ax.axhline(y=y, lw=0.1, c='black')
         else:
-            self.bar_ax.set_ylim(0, df.to_numpy().sum(axis=1).max())
+            #TODO when we are doing colour be genus we this series can evaluate to contain
+            #nan values and these are returned as the max rather than 1.
+            self.bar_ax.set_ylim(0, df.sum(axis=1).max(skipna=True))
             self.bar_ax.set_xlim(-0.5, len(df) - 0.5)
             if self.sample_outline:
                 for x in np.arange(0.5, len(df.index) - 1.5):
@@ -579,7 +569,7 @@ class SPBars(sputils.SPUtils):
 
         :param figsize: user supplied figure size tuple(<int>, <int>) in mm
 
-        :return: None. But, self.fig, self.bar_ax, self.leg_ax_one and self.leg_ax_two (if plot_type is 'seq_and_profile')
+        :return: None. But, self.fig, self.bar_ax, self.seq_leg_ax and self.prof_leg_ax (if plot_type is 'seq_and_profile')
         will be set.
         """
         if self.bar_ax is not None:
@@ -642,7 +632,14 @@ class SPBars(sputils.SPUtils):
             gs = gridspec.GridSpec(1, 2)
             if self.legend:
                 self.bar_ax = plt.subplot(gs[:, :1])
-                self.leg_ax_one = plt.subplot(gs[:, 1:2])
+                if self.color_by_genus:
+                    self.genera_leg_ax = plt.subplot(gs[:, 1:2])
+                elif self.plot_type == "seq_only":
+                    self.seq_leg_ax = plt.subplot(gs[:, 1:2])
+                elif self.plot_type == "profile_only":
+                    self.profile_leg_ax = plt.subplot(gs[:, 1:2])
+                else:
+                    raise RuntimeError(f"invalid plot_type {self.plot_type}")
             else:
                 self.bar_ax = plt.subplot(gs[:, :])
         else:
@@ -661,7 +658,14 @@ class SPBars(sputils.SPUtils):
             gs = gridspec.GridSpec(2, 1)
             if self.legend:
                 self.bar_ax = plt.subplot(gs[:1, :])
-                self.leg_ax_one = plt.subplot(gs[1:2, :])
+                if self.color_by_genus:
+                    self.genera_leg_ax = plt.subplot(gs[1:2, :])
+                elif self.plot_type == "seq_only":
+                    self.seq_leg_ax = plt.subplot(gs[1:2, :])
+                elif self.plot_type == "profile_only":
+                    self.profile_leg_ax = plt.subplot(gs[1:2, :])
+                else:
+                    raise RuntimeError(f"invalid plot_type {self.plot_type}")
             else:
                 self.bar_ax = plt.subplot(gs[:, :])
 
@@ -686,8 +690,8 @@ class SPBars(sputils.SPUtils):
             gs = gridspec.GridSpec(2, 2)
             if self.legend:
                 self.bar_ax = plt.subplot(gs[:2, :1])
-                self.leg_ax_one = plt.subplot(gs[:1, 1:2])
-                self.leg_ax_two = plt.subplot(gs[1:2, 1:2])
+                self.seq_leg_ax = plt.subplot(gs[:1, 1:2])
+                self.profile_leg_ax = plt.subplot(gs[1:2, 1:2])
             else:
                 self.bar_ax = plt.subplot(gs[:, :])
         else:
@@ -709,8 +713,8 @@ class SPBars(sputils.SPUtils):
             gs = gridspec.GridSpec(2, 2)
             if self.legend:
                 self.bar_ax = plt.subplot(gs[:1, :2])
-                self.leg_ax_one = plt.subplot(gs[1:2, :1])
-                self.leg_ax_two = plt.subplot(gs[1:2, 1:2])
+                self.seq_leg_ax = plt.subplot(gs[1:2, :1])
+                self.profile_leg_ax = plt.subplot(gs[1:2, 1:2])
             else:
                 self.bar_ax = plt.subplot(gs[:, :])
 
