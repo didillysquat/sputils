@@ -119,6 +119,8 @@ class SPBars(sputils.SPUtils):
         limit_genera (list): A list of genera to limit represented in the old Clade system.
         Passing ['A'] would mean that only Symbiodinium sequences or profiles were plotted. [list('ABCDEFGHI')]
 
+        add_sample_labels (bool): Whether to plot sample labels
+
     Returns:
         tuple(matplotlib.pyplot.figure, matplotlib.axes.Axes): The figure and axes object that contain the plot
 
@@ -133,7 +135,7 @@ class SPBars(sputils.SPUtils):
             reverse_seq_abund=False, reverse_profile_abund=False, color_by_genus=False, sample_outline=False,
             no_plotting=False, save_fig=False, fig_output_dir=None, bar_ax=None, seq_leg_ax=None, profile_leg_ax=None,
             genera_leg_ax=None, seq_color_dict=None, profile_color_dict=None, genus_color_dict=None,
-            limit_genera=list('ABCDEFGHI'), seq_profile_scalar=(1.0, 1.0)
+            limit_genera=list('ABCDEFGHI'), seq_profile_scalar=(1.0, 1.0), add_sample_labels=False
     ):
 
         # arguments that will be used throughout the class
@@ -164,6 +166,7 @@ class SPBars(sputils.SPUtils):
         self.no_plotting = no_plotting
         self.limit_genera = limit_genera
         self.seq_profile_scalar = seq_profile_scalar
+        self.add_sample_labels = add_sample_labels
 
         # Check the inputs
         self._check_user_inputs(profile_count_table_path, sample_name_compiled_re_excluded,
@@ -354,6 +357,7 @@ class SPBars(sputils.SPUtils):
         #TODO do legend plotting
         if self.legend:
             self._plot_legends()
+        plt.tight_layout()
         if self.save_fig:
             if self.fig_output_dir:
                 if not os.path.exists(self.fig_output_dir):
@@ -496,6 +500,12 @@ class SPBars(sputils.SPUtils):
     def _set_ax_lims_and_outline_only_plot(self, df):
         if self.orientation == 'v':
             self.bar_ax.set_ylim(-0.5, len(df) - 0.5)
+            if self.add_sample_labels:
+                self.spb.bar_ax.set_yticks(np.arange(0, len(df)))
+                self.spb.bar_ax.set_yticklabels([self.sample_uid_to_sample_name_dict[_] for _ in df.index.values], fontsize=4)
+            else:
+                self.spb.bar_ax.set_yticks([])
+                self.spb.bar_ax.set_yticklabels([])
             self.bar_ax.set_xlim(0, df.sum(axis=1).to_numpy().max())
             if self.sample_outline:
                 for y in np.arange(0.5, len(df.index) - 1.5):
@@ -506,6 +516,12 @@ class SPBars(sputils.SPUtils):
             #nan values and these are returned as the max rather than 1.
             self.bar_ax.set_ylim(0, df.sum(axis=1).max(skipna=True))
             self.bar_ax.set_xlim(-0.5, len(df) - 0.5)
+            if self.add_sample_labels:
+                self.spb.bar_ax.set_xticks(np.arange(0, len(df)))
+                self.spb.bar_ax.set_xticklabels([self.sample_uid_to_sample_name_dict[_] for _ in df.index.values], rotation=90, fontsize=4)
+            else:
+                self.spb.bar_ax.set_xticks([])
+                self.spb.bar_ax.set_xticklabels([])
             if self.sample_outline:
                 for x in np.arange(0.5, len(df.index) - 1.5):
                     #TODO dynamically program the lw
@@ -514,12 +530,24 @@ class SPBars(sputils.SPUtils):
     def _set_ax_lims_both_plot(self):
         if self.orientation == 'v':
             self.bar_ax.set_ylim(-0.5, len(self.seq_count_df.index) - 0.5)
+            if self.add_sample_labels:
+                self.spb.bar_ax.set_yticks(np.arange(0, len(self.seq_count_df)))
+                self.spb.bar_ax.set_yticklabels([self.sample_uid_to_sample_name_dict[_] for _ in self.seq_count_df.index.values], fontsize=4)
+            else:
+                self.spb.bar_ax.set_yticks([])
+                self.spb.bar_ax.set_yticklabels([])
             if self.seqs_right_bottom:
                 self.bar_ax.set_xlim(self.profile_count_df.sum(axis=1).to_numpy().max(), -1 * self.seq_count_df.sum(axis=1).to_numpy().max())
             else:
                 self.bar_ax.set_xlim(-1 * self.profile_count_df.sum(axis=1).to_numpy().max(), self.seq_count_df.sum(axis=1).to_numpy().max())
         else:
             self.bar_ax.set_xlim(-0.5, len(self.seq_count_df.index) - 0.5)
+            if self.add_sample_labels:
+                self.spb.bar_ax.set_xticks(np.arange(0, len(self.seq_count_df)))
+                self.spb.bar_ax.set_xticklabels([self.sample_uid_to_sample_name_dict[_] for _ in self.seq_count_df.index.values], rotation=90, fontsize=4)
+            else:
+                self.spb.bar_ax.set_xticks([])
+                self.spb.bar_ax.set_xticklabels([])
             if self.seqs_right_bottom:
                 self.bar_ax.set_ylim(self.profile_count_df.sum(axis=1).to_numpy().max(), -1 * self.seq_count_df.sum(axis=1).to_numpy().max())
             else:
