@@ -9,7 +9,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="sputils",
-    version='0.0.2',
+    version='0.0.5',
     author="Benjamin C C Hume",
     author_email="didillysquat@gmail.com",
     description="Package including modules to work with SymPortal outputs.",

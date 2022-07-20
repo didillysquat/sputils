@@ -1,8 +1,12 @@
 import os
 import pandas as pd
 import matplotlib as mpl
-mpl.use('TkAgg')
+# try:
+#     mpl.use('TkAgg')
+# except ImportError:
+#     mpl.use('Agg')
 import matplotlib.pyplot as plt
+plt.rcParams['svg.fonttype'] = 'none'
 import numpy as np
 from matplotlib.patches import Rectangle
 from matplotlib.collections import PatchCollection
@@ -501,11 +505,11 @@ class SPBars(sputils.SPUtils):
         if self.orientation == 'v':
             self.bar_ax.set_ylim(-0.5, len(df) - 0.5)
             if self.add_sample_labels:
-                self.spb.bar_ax.set_yticks(np.arange(0, len(df)))
-                self.spb.bar_ax.set_yticklabels([self.sample_uid_to_sample_name_dict[_] for _ in df.index.values], fontsize=4)
+                self.bar_ax.set_yticks(np.arange(0, len(df)))
+                self.bar_ax.set_yticklabels([self.sample_uid_to_sample_name_dict[_] for _ in df.index.values], fontsize=4)
             else:
-                self.spb.bar_ax.set_yticks([])
-                self.spb.bar_ax.set_yticklabels([])
+                self.bar_ax.set_yticks([])
+                self.bar_ax.set_yticklabels([])
             self.bar_ax.set_xlim(0, df.sum(axis=1).to_numpy().max())
             if self.sample_outline:
                 for y in np.arange(0.5, len(df.index) - 1.5):
@@ -517,11 +521,11 @@ class SPBars(sputils.SPUtils):
             self.bar_ax.set_ylim(0, df.sum(axis=1).max(skipna=True))
             self.bar_ax.set_xlim(-0.5, len(df) - 0.5)
             if self.add_sample_labels:
-                self.spb.bar_ax.set_xticks(np.arange(0, len(df)))
-                self.spb.bar_ax.set_xticklabels([self.sample_uid_to_sample_name_dict[_] for _ in df.index.values], rotation=90, fontsize=4)
+                self.bar_ax.set_xticks(np.arange(0, len(df)))
+                self.bar_ax.set_xticklabels([self.sample_uid_to_sample_name_dict[_] for _ in df.index.values], rotation=90, fontsize=4)
             else:
-                self.spb.bar_ax.set_xticks([])
-                self.spb.bar_ax.set_xticklabels([])
+                self.bar_ax.set_xticks([])
+                self.bar_ax.set_xticklabels([])
             if self.sample_outline:
                 for x in np.arange(0.5, len(df.index) - 1.5):
                     #TODO dynamically program the lw
@@ -531,11 +535,11 @@ class SPBars(sputils.SPUtils):
         if self.orientation == 'v':
             self.bar_ax.set_ylim(-0.5, len(self.seq_count_df.index) - 0.5)
             if self.add_sample_labels:
-                self.spb.bar_ax.set_yticks(np.arange(0, len(self.seq_count_df)))
-                self.spb.bar_ax.set_yticklabels([self.sample_uid_to_sample_name_dict[_] for _ in self.seq_count_df.index.values], fontsize=4)
+                self.bar_ax.set_yticks(np.arange(0, len(self.seq_count_df)))
+                self.bar_ax.set_yticklabels([self.sample_uid_to_sample_name_dict[_] for _ in self.seq_count_df.index.values], fontsize=4)
             else:
-                self.spb.bar_ax.set_yticks([])
-                self.spb.bar_ax.set_yticklabels([])
+                self.bar_ax.set_yticks([])
+                self.bar_ax.set_yticklabels([])
             if self.seqs_right_bottom:
                 self.bar_ax.set_xlim(self.profile_count_df.sum(axis=1).to_numpy().max(), -1 * self.seq_count_df.sum(axis=1).to_numpy().max())
             else:
@@ -543,11 +547,11 @@ class SPBars(sputils.SPUtils):
         else:
             self.bar_ax.set_xlim(-0.5, len(self.seq_count_df.index) - 0.5)
             if self.add_sample_labels:
-                self.spb.bar_ax.set_xticks(np.arange(0, len(self.seq_count_df)))
-                self.spb.bar_ax.set_xticklabels([self.sample_uid_to_sample_name_dict[_] for _ in self.seq_count_df.index.values], rotation=90, fontsize=4)
+                self.bar_ax.set_xticks(np.arange(0, len(self.seq_count_df)))
+                self.bar_ax.set_xticklabels([self.sample_uid_to_sample_name_dict[_] for _ in self.seq_count_df.index.values], rotation=90, fontsize=4)
             else:
-                self.spb.bar_ax.set_xticks([])
-                self.spb.bar_ax.set_xticklabels([])
+                self.bar_ax.set_xticks([])
+                self.bar_ax.set_xticklabels([])
             if self.seqs_right_bottom:
                 self.bar_ax.set_ylim(self.profile_count_df.sum(axis=1).to_numpy().max(), -1 * self.seq_count_df.sum(axis=1).to_numpy().max())
             else:
