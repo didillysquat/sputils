@@ -1,10 +1,6 @@
 import os
 import pandas as pd
 import matplotlib as mpl
-# try:
-#     mpl.use('TkAgg')
-# except ImportError:
-#     mpl.use('Agg')
 import matplotlib.pyplot as plt
 plt.rcParams['svg.fonttype'] = 'none'
 import numpy as np
@@ -722,8 +718,11 @@ class SPBars(sputils.SPUtils):
             gs = gridspec.GridSpec(2, 2)
             if self.legend:
                 self.bar_ax = plt.subplot(gs[:2, :1])
-                self.seq_leg_ax = plt.subplot(gs[:1, 1:2])
-                self.profile_leg_ax = plt.subplot(gs[1:2, 1:2])
+                if self.color_by_genus:
+                    self.genera_leg_ax = plt.subplot(gs[:, 1:2])
+                else:
+                    self.seq_leg_ax = plt.subplot(gs[:1, 1:2])
+                    self.profile_leg_ax = plt.subplot(gs[1:2, 1:2])
             else:
                 self.bar_ax = plt.subplot(gs[:, :])
         else:
@@ -745,8 +744,11 @@ class SPBars(sputils.SPUtils):
             gs = gridspec.GridSpec(2, 2)
             if self.legend:
                 self.bar_ax = plt.subplot(gs[:1, :2])
-                self.seq_leg_ax = plt.subplot(gs[1:2, :1])
-                self.profile_leg_ax = plt.subplot(gs[1:2, 1:2])
+                if self.color_by_genus:
+                    self.genera_leg_ax = plt.subplot(gs[1:2, :])
+                else:
+                    self.seq_leg_ax = plt.subplot(gs[1:2, :1])
+                    self.profile_leg_ax = plt.subplot(gs[1:2, 1:2])
             else:
                 self.bar_ax = plt.subplot(gs[:, :])
 
